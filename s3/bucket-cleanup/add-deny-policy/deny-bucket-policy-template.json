@@ -1,0 +1,13 @@
+{
+    "Version": "2012-10-17",
+    "Id": "PutObjPolicy",
+    "Statement": [
+        {
+            "Sid": "DenyObject",
+            "Principal": "*",
+            "Effect": "Deny",
+            "Action": "s3:PutObject",
+            "Resource": "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER/*"
+        }
+    ]
+}
