@@ -1,5 +1,11 @@
+import time
 import sys
 import boto3
+from concurrent.futures import ThreadPoolExecutor
+
+# ###########
+start_time = time.time()
+# ###########
 
 def bucket_exists(bucket_name):
     s3 = boto3.client('s3')
@@ -9,17 +15,25 @@ def bucket_exists(bucket_name):
     except s3.exceptions.ClientError:
         return False
 
+def delete_objects_in_page(bucket_name, objects):
+    s3 = boto3.client('s3')
+    if objects:
+        s3.delete_objects(Bucket=bucket_name, Delete={'Objects': objects})
+        print(f"Deleted {len(objects)} objects from bucket '{bucket_name}'.")
+
 def delete_objects(bucket_name):
     s3 = boto3.client('s3')
-    response = s3.list_objects_v2(Bucket=bucket_name)
+    paginator = s3.get_paginator('list_objects_v2')
 
-    if 'Contents' in response:
-        print(f"Objects found in bucket '{bucket_name}'. Deleting all objects...")
-        objects = [{'Key': obj['Key']} for obj in response['Contents']]
-        s3.delete_objects(Bucket=bucket_name, Delete={'Objects': objects})
-        print(f"All objects deleted in bucket '{bucket_name}'.")
-    else:
-        print(f"Bucket '{bucket_name}' is empty. No objects to delete.")
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for page in paginator.paginate(Bucket=bucket_name):
+            if 'Contents' in page:
+                objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
+                futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete))
+        
+        for future in futures:
+            future.result()
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -33,3 +47,10 @@ if __name__ == "__main__":
             delete_objects(bucket_name)
         else:
             print(f"Bucket '{bucket_name}' does not exist.")
+
+
+# ###########
+end_time = time.time()
+duration = end_time - start_time
+print("Script duration:", duration, "seconds")
+# ###########
