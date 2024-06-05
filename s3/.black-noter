@@ -1,0 +1,25 @@
+aws s3 ls s3://viv-testing-scripts/
+
+aws s3 cp ./testfile s3://viv-testing-scripts/
+
+
+for i in {1..12}; do echo "This is test file $i" > testfile-$i; aws s3 cp testfile-$i s3://viv-testing-scripts/; rm testfile-$i; done
+
+
+# a command that creates 3 buckets: viv-testin-scripts-0x where X is a number from 1 to 3 for those buckets. # create 12 generated files with names ---testfile-X, where X is a number from 1 to 12
+# also it removes files locally
+for i in {1..3}; do
+    bucket_name="viv-testing-scripts-0$i"
+    aws s3 mb s3://$bucket_name
+    for j in {1..12}; do
+        echo "This is test file $j" > $bucket_name---testfile-$j
+        aws s3 cp $bucket_name---testfile-$j s3://$bucket_name/
+        rm $bucket_name---testfile-$j
+    done
+done
+
+
+
+
+# run
+python delete-s3-bucket-content.py viv-testing-scripts-01 viv-testing-scripts-02 viv-testing-scripts-03

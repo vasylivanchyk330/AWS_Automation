@@ -1,0 +1,5 @@
+.gitignore
+*/.black-noter
+*/*/.black-noter
+.black-note
+.black-noter
