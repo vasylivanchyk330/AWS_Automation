@@ -8,10 +8,14 @@ def run_script(script_path, script_args, log_file):
     try:
         result = subprocess.run(["python", script_path] + script_args, check=True, capture_output=True, text=True)
         with open(log_file, 'a') as log:
-            log.write(f"Output of {script_path}:\n{result.stdout}\n")
+            log.write(f"Output of {script_path}:\n")
+            log.write(result.stdout)
+            log.write(result.stderr)
     except subprocess.CalledProcessError as e:
         with open(log_file, 'a') as log:
-            log.write(f"Error running {script_path}:\n{e.stderr}\n")
+            log.write(f"Error running {script_path}:\n")
+            log.write(e.stdout)
+            log.write(e.stderr)
 
 def main(bucket_names, wait_time, log_file):
     # List of scripts to run in the given order with their respective arguments
@@ -46,4 +50,5 @@ if __name__ == "__main__":
     log_file = args.log_file or f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     main(bucket_names, wait_time, log_file)
+
 
