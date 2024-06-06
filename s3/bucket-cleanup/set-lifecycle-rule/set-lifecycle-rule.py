@@ -2,6 +2,10 @@ import sys
 import os
 import json
 import boto3
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def apply_combined_lifecycle_policy(bucket_name, policy_files):
     s3_client = boto3.client('s3')
@@ -13,7 +17,7 @@ def apply_combined_lifecycle_policy(bucket_name, policy_files):
     # Read and combine the lifecycle policies
     for policy_file in policy_files:
         if not os.path.isfile(policy_file):
-            print(f"Lifecycle policy file {policy_file} not found!")
+            logging.error(f"Lifecycle policy file {policy_file} not found!")
             sys.exit(1)
 
         with open(policy_file, 'r') as file:
@@ -26,14 +30,14 @@ def apply_combined_lifecycle_policy(bucket_name, policy_files):
             Bucket=bucket_name,
             LifecycleConfiguration=combined_policies
         )
-        print(f"Combined lifecycle rules from {', '.join(policy_files)} applied successfully to {bucket_name}")
+        logging.info(f"Combined lifecycle rules from {', '.join(policy_files)} applied successfully to {bucket_name}")
     except Exception as e:
-        print(f"Failed to apply combined lifecycle rules to {bucket_name}: {e}")
+        logging.error(f"Failed to apply combined lifecycle rules to {bucket_name}: {e}")
         sys.exit(1)
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python script.py <bucket-name> <lifecycle-policy1> <lifecycle-policy2> ...")
+        logging.error("Usage: python script.py <bucket-name> <lifecycle-policy1> <lifecycle-policy2> ...")
         sys.exit(1)
 
     bucket_name = sys.argv[1]
