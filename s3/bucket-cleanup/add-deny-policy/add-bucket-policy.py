@@ -4,15 +4,14 @@ import json
 import tempfile
 import boto3
 
-def create_bucket_policy(bucket_name):
-    s3_client = boto3.client('s3')
+s3_client = boto3.client('s3')
 
-    template_file = "deny-bucket-policy-template.json"
+def apply_bucket_policy(bucket_name, template_file):
 
     # Check if the template file exists
     if not os.path.isfile(template_file):
         print(f"Template file {template_file} not found!")
-        sys.exit(1)
+        return
 
     # Read the template file
     with open(template_file, "r") as template:
@@ -29,14 +28,31 @@ def create_bucket_policy(bucket_name):
             policy_json = json.load(policy)
             s3_client.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(policy_json))
 
-        print(f"Bucket policy applied successfully to {bucket_name}")
+        print(f"Bucket policy from {template_file} applied successfully to {bucket_name}")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <bucket-name1> <bucket-name2> ...")
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: python script.py <bucket-name1> <bucket-name2> ... <template-file1> <template-file2> ...")
         sys.exit(1)
 
-    bucket_names = sys.argv[1:]
+    # Separate bucket names and template files
+    bucket_names = []
+    template_files = []
+
+    # Collect bucket names and template files based on input arguments
+    for arg in sys.argv[1:]:
+        if os.path.isfile(arg):
+            template_files.append(arg)
+        else:
+            bucket_names.append(arg)
+
+    if not bucket_names or not template_files:
+        print("Error: Provide at least one bucket name and one template file.")
+        sys.exit(1)
 
     for bucket_name in bucket_names:
-        create_bucket_policy(bucket_name)
+        for template_file in template_files:
+            apply_bucket_policy(bucket_name, template_file)
+
+if __name__ == "__main__":
+    main()
