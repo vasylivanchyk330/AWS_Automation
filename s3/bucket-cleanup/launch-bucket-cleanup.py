@@ -1,6 +1,7 @@
 import subprocess
 import time
 import argparse
+from datetime import datetime
 
 def run_script(script_path, script_args, log_file):
     """Run a script with arguments and wait for it to finish."""
@@ -36,12 +37,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
     parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
     parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
-    parser.add_argument("--log-file", "-l", type=str, default="script.log", help="Log file to store the output")
+    parser.add_argument("--log-file", "-l", type=str, help="Log file to store the output")
 
     args = parser.parse_args()
 
     bucket_names = args.buckets
     wait_time = args.lifecycle_rules_wait
-    log_file = args.log_file
+    log_file = args.log_file or f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     main(bucket_names, wait_time, log_file)
