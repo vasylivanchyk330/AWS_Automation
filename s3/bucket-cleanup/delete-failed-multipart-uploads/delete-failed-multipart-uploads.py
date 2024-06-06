@@ -1,8 +1,10 @@
 import sys
 import boto3
 
+s3_client = boto3.client('s3')
+
 def delete_failed_multipart_uploads(bucket_name):
-    s3_client = boto3.client('s3')
+
     try:
         multipart_uploads = s3_client.list_multipart_uploads(Bucket=bucket_name)
         if 'Uploads' in multipart_uploads:

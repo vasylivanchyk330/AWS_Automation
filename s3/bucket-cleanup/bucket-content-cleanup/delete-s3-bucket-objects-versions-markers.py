@@ -1,10 +1,11 @@
-
 import time
 import sys
-import boto3
+import subprocess
 import logging
+import json
 import math
 from concurrent.futures import ThreadPoolExecutor
+import boto3
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,27 +13,56 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 s3 = boto3.client('s3')
 
 def bucket_exists(bucket_name):
-    """Check if a bucket exists."""
+    """Check if a bucket exists using AWS CLI."""
     try:
-        s3.head_bucket(Bucket=bucket_name)
-        return True
-    except s3.exceptions.ClientError:
+        result = subprocess.run(["aws", "s3api", "head-bucket", "--bucket", bucket_name], capture_output=True, text=True, check=True)
+        if result.returncode == 0:
+            bucket_info = subprocess.run(["aws", "s3api", "get-bucket-location", "--bucket", bucket_name], capture_output=True, text=True, check=True)
+            bucket_info_json = json.loads(bucket_info.stdout)
+            bucket_region = bucket_info_json.get('LocationConstraint', 'us-east-1')
+            access_point_alias = False  # This would typically be fetched through another call if available
+            logging.info(f"Bucket Name: {bucket_name}")
+            logging.info(f"Bucket Region: {bucket_region}")
+            logging.info(f"AccessPointAlias: {access_point_alias}")
+            return True
+        return False
+    except subprocess.CalledProcessError:
         return False
 
 def get_bucket_stats(bucket_name):
-    """Get the total number and size of objects in a bucket."""
+    """Get the total number and size of objects in a bucket using AWS CLI."""
+    result = subprocess.run(
+        ["aws", "s3api", "list-objects-v2", "--bucket", bucket_name, "--query", "Contents[].Size"],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    if result.stdout.strip():
+        sizes = json.loads(result.stdout)
+        if sizes:
+            total_size = sum(sizes)
+            total_count = len(sizes)
+            return total_count, total_size
+    return 0, 0
 
-    # paginator -- to overcome 1000-record limitation
-    paginator = s3.get_paginator('list_objects_v2')
-    total_size = 0
-    total_count = 0
-
-    for page in paginator.paginate(Bucket=bucket_name):
-        if 'Contents' in page:
-            total_count += len(page['Contents'])
-            total_size += sum(obj['Size'] for obj in page['Contents'])
-
-    return total_count, total_size
+def get_bucket_versions_stats(bucket_name):
+    """Get the total number and size of object versions and delete markers in a bucket using AWS CLI."""
+    result = subprocess.run(
+        ["aws", "s3api", "list-object-versions", "--bucket", bucket_name, "--query", "[Versions[].Size, DeleteMarkers[].Size]"],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    if result.stdout.strip():
+        sizes = json.loads(result.stdout)
+        version_sizes = sizes[0] if sizes[0] else []
+        marker_sizes = sizes[1] if sizes[1] else []
+        total_version_size = sum(version_sizes)
+        total_version_count = len(version_sizes)
+        total_marker_size = sum(marker_sizes)
+        total_marker_count = len(marker_sizes)
+        return total_version_count, total_version_size, total_marker_count, total_marker_size
+    return 0, 0, 0, 0
 
 def delete_objects_in_page(bucket_name, objects):
     """Delete a batch of objects in a bucket."""
@@ -50,13 +80,10 @@ def delete_objects_in_page(bucket_name, objects):
 
 def delete_all_versions(bucket_name):
     """Delete all object versions and delete markers in a bucket."""
-
-    # paginator -- to overcome 1000-record limitation
     paginator = s3.get_paginator('list_object_versions')
     object_count = 0
     start_time = time.time()
 
-    # ThreadPoolExecutor -- to make paginated records deleted concurrently
     with ThreadPoolExecutor() as executor:
         futures = []
         for page in paginator.paginate(Bucket=bucket_name):
@@ -74,7 +101,6 @@ def delete_all_versions(bucket_name):
 
     end_time = time.time()
     duration = end_time - start_time
-    logging.info(f"Deleted {object_count} versions and delete markers from bucket '{bucket_name}' in {duration:.2f} seconds.")
     return object_count, duration
 
 def delete_all_objects(bucket_name):
@@ -82,8 +108,7 @@ def delete_all_objects(bucket_name):
     paginator = s3.get_paginator('list_objects_v2')
     object_count = 0
     start_time = time.time()
-    
-    # ThreadPoolExecutor -- to make paginated records deleted concurrently
+
     with ThreadPoolExecutor() as executor:
         futures = []
         for page in paginator.paginate(Bucket=bucket_name):
@@ -96,7 +121,6 @@ def delete_all_objects(bucket_name):
 
     end_time = time.time()
     duration = end_time - start_time
-    logging.info(f"Deleted {object_count} objects from bucket '{bucket_name}' in {duration:.2f} seconds.")
     return object_count, duration
 
 def bytes_to_human_readable(size_in_bytes):
@@ -117,26 +141,34 @@ if __name__ == "__main__":
     start_time = time.time()
     bucket_names = sys.argv[1:]
 
-    total_object_count = 0
-    total_version_count = 0
-    total_size_before = 0
-    total_size_after = 0
-
     for bucket_name in bucket_names:
         if bucket_exists(bucket_name):
             pre_delete_count, pre_delete_size = get_bucket_stats(bucket_name)
-            logging.info(f"Bucket '{bucket_name}' contains {pre_delete_count} objects with total size {bytes_to_human_readable(pre_delete_size)} before deletion.")
+            pre_version_count, pre_version_size, pre_marker_count, pre_marker_size = get_bucket_versions_stats(bucket_name)
+            total_bucket_size_before = pre_delete_size + pre_version_size + pre_marker_size
+
+            logging.info(f"Total Object Count Before Deletion: {pre_delete_count}")
+            logging.info(f"Total Object Size Before Deletion: {bytes_to_human_readable(pre_delete_size)}")
+            logging.info(f"Total Version Count Before Deletion: {pre_version_count}")
+            logging.info(f"Total Version Size Before Deletion: {bytes_to_human_readable(pre_version_size)}")
+            logging.info(f"Total Delete Marker Count Before Deletion: {pre_marker_count}")
+            logging.info(f"Total Delete Marker Size Before Deletion: {bytes_to_human_readable(pre_marker_size)}")
+            logging.info(f"Total Bucket Size Before Deletion: {bytes_to_human_readable(total_bucket_size_before)}")
 
             obj_count, obj_duration = delete_all_objects(bucket_name)
             version_count, version_duration = delete_all_versions(bucket_name)
-            total_object_count += obj_count
-            total_version_count += version_count
 
             post_delete_count, post_delete_size = get_bucket_stats(bucket_name)
-            logging.info(f"Bucket '{bucket_name}' contains {post_delete_count} objects with total size {bytes_to_human_readable(post_delete_size)} after deletion.")
+            post_version_count, post_version_size, post_marker_count, post_marker_size = get_bucket_versions_stats(bucket_name)
+            total_bucket_size_after = post_delete_size + post_version_size + post_marker_size
 
-            total_size_before += pre_delete_size
-            total_size_after += post_delete_size
+            logging.info(f"Total Object Count After Deletion: {post_delete_count}")
+            logging.info(f"Total Object Size After Deletion: {bytes_to_human_readable(post_delete_size)}")
+            logging.info(f"Total Version Count After Deletion: {post_version_count}")
+            logging.info(f"Total Version Size After Deletion: {bytes_to_human_readable(post_version_size)}")
+            logging.info(f"Total Delete Marker Count After Deletion: {post_marker_count}")
+            logging.info(f"Total Delete Marker Size After Deletion: {bytes_to_human_readable(post_marker_size)}")
+            logging.info(f"Total Bucket Size After Deletion: {bytes_to_human_readable(total_bucket_size_after)}")
 
             logging.info(f"Time to delete objects: {obj_duration:.2f} seconds")
             logging.info(f"Time to delete versions and delete markers: {version_duration:.2f} seconds")
@@ -147,8 +179,4 @@ if __name__ == "__main__":
     total_duration = end_time - start_time
 
     # Print summary of operations
-    logging.info(f"Total objects deleted: {total_object_count}")
-    logging.info(f"Total versions and delete markers deleted: {total_version_count}")
-    logging.info(f"Total size before deletion: {bytes_to_human_readable(total_size_before)}")
-    logging.info(f"Total size after deletion: {bytes_to_human_readable(total_size_after)}")
     logging.info(f"Total script duration: {total_duration:.2f} seconds")
