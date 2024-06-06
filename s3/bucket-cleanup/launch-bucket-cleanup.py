@@ -16,8 +16,8 @@ def run_script(script_path, script_args, log_file):
 def main(bucket_names, wait_time, log_file):
     # List of scripts to run in the given order with their respective arguments
     scripts = [
-        ("add-deny-policy/add-bucket-policy.py", ["add-deny-policy/deny-bucket-policy-template.json"]),
-        ("set-lifecycle-rule/set-lifecycle-rule.py", ["set-lifecycle-rule/lifecycle-policy-01.json", "set-lifecycle-rule/lifecycle-policy-02.json"]),
+        ("add-deny-policy/add-bucket-policy.py", ["deny-bucket-policy-template.json"]),
+        ("set-lifecycle-rule/set-lifecycle-rule.py", ["lifecycle-policy-01.json", "lifecycle-policy-02.json"]),
         ("bucket-content-cleanup/delete-s3-bucket-objects-versions-markers.py", bucket_names),
         ("delete-failed-multipart-uploads/delete-failed-multipart-uploads.py", bucket_names),
         ("delete-bucket/delete-bucket.py", bucket_names)
