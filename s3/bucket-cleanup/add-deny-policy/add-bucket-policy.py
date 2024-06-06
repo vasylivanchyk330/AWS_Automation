@@ -3,6 +3,10 @@ import os
 import json
 import tempfile
 import boto3
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 s3_client = boto3.client('s3')
 
@@ -10,7 +14,7 @@ def apply_bucket_policy(bucket_name, template_file):
 
     # Check if the template file exists
     if not os.path.isfile(template_file):
-        print(f"Template file {template_file} not found!")
+        logging.error(f"Template file {template_file} not found!")
         return
 
     # Read the template file
@@ -24,15 +28,18 @@ def apply_bucket_policy(bucket_name, template_file):
         tmp_file.flush()
 
         # Apply the bucket policy
-        with open(tmp_file.name, "r") as policy:
-            policy_json = json.load(policy)
-            s3_client.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(policy_json))
+        try:
+            with open(tmp_file.name, "r") as policy:
+                policy_json = json.load(policy)
+                s3_client.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(policy_json))
 
-        print(f"Bucket policy from {template_file} applied successfully to {bucket_name}")
+            logging.info(f"Bucket policy from {template_file} applied successfully to {bucket_name}")
+        except Exception as e:
+            logging.error(f"Failed to apply bucket policy from {template_file} to {bucket_name}: {e}")
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python script.py <bucket-name1> <bucket-name2> ... <template-file1> <template-file2> ...")
+        logging.error("Usage: python script.py <bucket-name1> <bucket-name2> ... <template-file1> <template-file2> ...")
         sys.exit(1)
 
     # Separate bucket names and template files
@@ -47,7 +54,7 @@ def main():
             bucket_names.append(arg)
 
     if not bucket_names or not template_files:
-        print("Error: Provide at least one bucket name and one template file.")
+        logging.error("Error: Provide at least one bucket name and one template file.")
         sys.exit(1)
 
     for bucket_name in bucket_names:
