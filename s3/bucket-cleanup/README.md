@@ -20,14 +20,14 @@ This repository contains scripts and configurations for cleaning up AWS S3 bucke
 
 ## Nested Scripts
 
-#### Add Deny Policy
+#### 1. Add Deny Policy
 
 Scripts to add deny policies to S3 buckets to prevent specific actions.
 
 - `add-deny-policy/add-bucket-policy.py`: Script to add a deny policy to an S3 bucket.
 - `add-deny-policy/deny-bucket-policy-template.json`: Template JSON for the deny policy.
 
-#### Bucket Content Cleanup
+#### 2. Bucket Content Cleanup
 
 Scripts to clean up the contents of an S3 bucket, including object versions and version delete markers.
 
@@ -39,20 +39,20 @@ Scripts to clean up the contents of an S3 bucket, including object versions and 
 
 - **ThreadPoolExecutor**: The `ThreadPoolExecutor` from the `concurrent.futures` module is used to perform concurrent execution of function calls using a pool of threads. In this script, it is used to delete objects and versions in parallel, significantly speeding up the cleanup process. By submitting multiple deletion tasks to the thread pool, the script can handle multiple delete operations simultaneously, improving performance and reducing the total time required for cleanup.
 
-#### Delete Bucket
+#### 3. Delete Bucket
 
 Scripts to delete an S3 bucket.
 
 - `delete-bucket/delete-bucket.py`: Script to delete an S3 bucket after cleaning up its contents.
 - `delete-bucket/instruction-and-problem-statement--s3-bucket-deletion-problem.sh`: Instructions and problem statement for S3 bucket deletion.
 
-#### Delete Failed Multipart Uploads
+#### 4. Delete Failed Multipart Uploads
 
 Scripts to identify and delete failed multipart uploads in S3 buckets.
 
 - `delete-failed-multipart-uploads/delete-failed-multipart-uploads.py`: Script to delete failed multipart uploads from an S3 bucket.
 
-#### Set Lifecycle Rule
+#### 5. Set Lifecycle Rule
 
 Scripts to set lifecycle policies for S3 buckets.
 
@@ -67,6 +67,12 @@ Scripts to set lifecycle policies for S3 buckets.
 Main script to launch the bucket cleanup process.
 
 - `launch-bucket-cleanup.py`: Main script to initiate the cleanup process across multiple buckets.
+
+#### Script Options
+
+- `buckets`: Names of the S3 buckets to be managed. This is a positional argument and should be provided as a space-separated list.
+- `--lifecycle-rules-wait` or `-w`: Optional argument specifying the number of minutes to wait after setting lifecycle rules. Default is 0.
+- `--log-file` or `-l`: Optional argument specifying the log file to store the output. If not provided, a log file will be created with the name format `script_<timestamp>.log`.
 
 
 ## Log Location
