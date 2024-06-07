@@ -22,15 +22,28 @@ def setup_logger(log_file):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
+def log_unique_lines(log_func, message):
+    """Log each line in the message uniquely."""
+    seen_lines = set()
+    for line in message.splitlines():
+        if line not in seen_lines:
+            log_func(line)
+            seen_lines.add(line)
+
 def run_script(script_path, script_args):
     """Run a script with arguments and wait for it to finish."""
     try:
         result = subprocess.run(["python", script_path] + script_args, check=True, capture_output=True, text=True)
-        logging.info(f"Output of {script_path}:\n{result.stdout}")
+        logging.info(f"Output of {script_path}:\n")
+        if result.stdout:
+            log_unique_lines(logging.info, result.stdout)
         if result.stderr:
-            logging.info(result.stderr)
+            log_unique_lines(logging.info, result.stderr)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Error running {script_path}:\n{e.stdout}\n{e.stderr}")
+        if e.stdout:
+            log_unique_lines(logging.error, e.stdout)
+        if e.stderr:
+            log_unique_lines(logging.error, e.stderr)
 
 def main(bucket_names, wait_time, log_file):
     # Setup logger
@@ -46,6 +59,7 @@ def main(bucket_names, wait_time, log_file):
     ]
 
     for script_path, script_args in scripts:
+        logging.info(f"STARTING SCRIPT RUN -- {script_path}")
         logging.info(f"Running {script_path} with arguments {script_args}...")
         run_script(script_path, script_args)
         logging.info(f"Finished running {script_path}.\n")
@@ -68,3 +82,4 @@ if __name__ == "__main__":
     log_file = args.log_file or f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     main(bucket_names, wait_time, log_file)
+
