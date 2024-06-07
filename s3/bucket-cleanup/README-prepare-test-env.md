@@ -2,6 +2,16 @@
 
 This document provides (more-or-less) detailed instructions for setting up a test environment for the S3 Bucket Cleanup scripts.
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Setting Up AWS Resources](#setting-up-aws-resources)
+- [Useful Commands](#useful-commands)
+- [Running the Tests](#running-the-tests)
+- [Cleaning Up](#cleaning-up)
+- [Notes](#notes)
+
+
 ## Prerequisites
 
 - An AWS account with appropriate permissions.
