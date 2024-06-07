@@ -72,7 +72,7 @@ Main script to launch the bucket cleanup process.
 
 - `buckets`: Names of the S3 buckets to be managed. This is a positional argument and should be provided as a space-separated list.
 - `--lifecycle-rules-wait` or `-w`: Optional argument specifying the number of minutes to wait after setting lifecycle rules. Default is 0.
-- `--log-file` or `-l`: Optional argument specifying the log file to store the output. If not provided, a log file will be created with the name format `./.script-logs/script_<timestamp>.log`; 
+- `--log-file` or `-l`: Optional argument specifying the log file to store the output. If not provided, a log file will be created with the name format `./.script-logs/script_<timestamp>.log`; use `ls -al` to see `./.script-logs/`.
 
 
 ## Log Location
