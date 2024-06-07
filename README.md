@@ -1,6 +1,7 @@
 # S3 Bucket Cleanup
 
-This repository contains scripts and configurations to manage and clean up AWS S3 buckets. The scripts are organized into different categories based on their functionality.
+This repository contains scripts and configurations for cleaning up AWS S3 buckets. The scripts are organized into different categories based on their functionality.
+The goal: automate cumbersum "clicking"-liek procedure of bucket clean-up.
 
 ## Table of Contents
 
@@ -11,6 +12,7 @@ This repository contains scripts and configurations to manage and clean up AWS S
 - [Set Lifecycle Rule](#set-lifecycle-rule)
 - [Launch Bucket Cleanup](#launch-bucket-cleanup)
 - [Instructions](#instructions)
+- [Glossary](#glossary)
 
 ## Add Deny Policy
 
@@ -21,7 +23,7 @@ Scripts to add deny policies to S3 buckets to prevent specific actions.
 
 ## Bucket Content Cleanup
 
-Scripts to clean up the contents of an S3 bucket, including object versions.
+Scripts to clean up the contents of an S3 bucket, including object versions and version delete markers.
 
 - `delete-s3-bucket-objects-versions.py`: Script to delete all objects and versions in an S3 bucket.
 
@@ -99,3 +101,30 @@ Detailed instructions for using the S3 bucket cleanup scripts.
 To delete all objects and versions in an S3 bucket:
 ```sh
 python bucket-content-cleanup/delete-s3-bucket-objects-versions.py
+
+
+
+
+## Glossary
+
+### A bucket key
+
+- **Definition**: (from a bucket-level point of view) path to an object in the bucket.
+    - Example:
+        - `my-bucket` -- a bucket name
+        - `photos/2024/vacation.jpg` -- a key, where the object is stored
+        - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path
+
+### Delete Marker
+
+- **Definition**: When versioning is enabled on a bucket, deleting an object does not actually remove its data. Instead, a delete marker is created.
+    - **Purpose**: Allows recovering deleted objects if needed.
+
+### Multipart Upload
+
+- **Definition**: A feature in Amazon S3 that allows uploading a single object as a set of parts. Each part is uploaded independently, and the parts can be uploaded in parallel to reduce the time taken to upload large files.
+    - **Potential Issues**: Such multipart uploads could fail, causing unexpected issues later on, for example, when trying to delete a bucket.
+    - **Example**: Listing multipart uploads in a bucket:
+        ```sh
+        aws s3api list-multipart-uploads --bucket my-bucket
+        ```
