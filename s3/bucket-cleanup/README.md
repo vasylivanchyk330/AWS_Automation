@@ -36,6 +36,7 @@ Scripts to clean up the contents of an S3 bucket, including object versions and 
 Scripts to delete an S3 bucket.
 
 - `delete-bucket/delete-bucket.py`: Script to delete an S3 bucket after cleaning up its contents.
+- `delete-bucket/instruction-and-problem-statement--s3-bucket-deletion-problem.sh`: Instructions and problem statement for S3 bucket deletion.
 
 #### Delete Failed Multipart Uploads
 
@@ -63,7 +64,7 @@ Main script to launch the bucket cleanup process.
 
 Detailed instructions for using the S3 bucket cleanup scripts.
 
-- `instruction---s3-bucket-deletion-cleanup.md`: Instructions for setting up and running the bucket cleanup scripts.
+- `delete-bucket/instruction-and-problem-statement--s3-bucket-deletion-problem.sh`: the name of the file is self-explanatory.
 
 ## Getting Started
 
@@ -113,14 +114,6 @@ Detailed instructions for using the S3 bucket cleanup scripts.
 
 ## Glossary
 
-### A bucket key
-
-- **Definition**: (from a bucket-level point of view) path to an object in the bucket.
-    - Example:
-        - `my-bucket` -- a bucket name
-        - `photos/2024/vacation.jpg` -- a key, where the object is stored
-        - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path
-
 ### Delete Marker
 
 - **Definition**: When versioning is enabled on a bucket, deleting an object does not actually remove its data. Instead, a delete marker is created.
@@ -134,3 +127,11 @@ Detailed instructions for using the S3 bucket cleanup scripts.
         ```sh
         aws s3api list-multipart-uploads --bucket my-bucket
         ```
+
+### Object Key
+
+- **Definition**: (from a bucket-level point of view) path to an object in the bucket.
+    - Example:
+        - `my-bucket` -- a bucket name
+        - `photos/2024/vacation.jpg` -- a key, where the object is stored
+        - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path to the object
