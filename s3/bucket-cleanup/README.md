@@ -1,6 +1,7 @@
 # S3 Bucket Cleanup
 
 This repository contains scripts and configurations for cleaning up AWS S3 buckets. The scripts are organized into different categories based on their functionality.
+
 **The goal: automate cumbersome bucket clean-up "clicking"-like procedure.**
 
 ## Table of Contents
