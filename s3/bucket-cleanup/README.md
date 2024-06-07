@@ -14,7 +14,7 @@ This repository contains scripts and configurations for cleaning up AWS S3 bucke
   - [Set Lifecycle Rule](#set-lifecycle-rule)
 - [Main Script](#main-script):
   - [Launch Bucket Cleanup](#launch-bucket-cleanup)
-- [Instructions](#instructions)
+- [Log Location](#log-location)
 - [Glossary](#glossary)
 - [Preparing a Test Environment](#preparing-a-test-environment)
 
@@ -62,11 +62,11 @@ Main script to launch the bucket cleanup process.
 
 - `launch-bucket-cleanup.py`: Main script to initiate the cleanup process across multiple buckets.
 
-## Instructions
 
-Detailed instructions for using the S3 bucket cleanup scripts.
+## Log Location
 
-- `delete-bucket/instruction-and-problem-statement--s3-bucket-deletion-problem.sh`: the name of the file is self-explanatory.
+The script logs the output of each step to a log file. By default, the log location is `./.script-logs/`; the log file is named `script_<timestamp>.log`. You can specify a custom log file location using the `--log-file` argument when running the script.
+
 
 ## Getting Started
 
