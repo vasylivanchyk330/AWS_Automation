@@ -7,7 +7,6 @@ This document provides (more-or-less) detailed instructions for setting up a tes
 - [Prerequisites](#prerequisites)
 - [Setting Up AWS Resources](#setting-up-aws-resources)
 - [Useful Commands](#useful-commands)
-- [Running the Tests](#running-the-tests)
 - [Cleaning Up](#cleaning-up)
 - [Notes](#notes)
 
