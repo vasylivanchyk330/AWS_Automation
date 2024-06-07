@@ -15,6 +15,7 @@ This repository contains scripts and configurations for cleaning up AWS S3 bucke
   - [Launch Bucket Cleanup](#launch-bucket-cleanup)
 - [Instructions](#instructions)
 - [Glossary](#glossary)
+- [Preparing a Test Environment](#preparing-a-test-environment)
 
 ## Nested Scripts
 
@@ -135,3 +136,8 @@ Detailed instructions for using the S3 bucket cleanup scripts.
         - `my-bucket` -- a bucket name
         - `photos/2024/vacation.jpg` -- a key, where the object is stored
         - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path to the object
+
+
+## Preparing a Test Environment
+
+For detailed instructions on setting up a test environment, refer to [README-prepare-test-env.md](README-prepare-test-env.md).
