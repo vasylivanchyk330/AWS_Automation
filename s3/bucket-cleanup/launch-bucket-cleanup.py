@@ -3,6 +3,7 @@ import time
 import argparse
 from datetime import datetime
 import logging
+import os
 
 def setup_logger(log_file):
     """Setup logger to log messages to both console and file."""
@@ -69,6 +70,9 @@ def main(bucket_names, wait_time, log_file):
             logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
             time.sleep(wait_time * 60)  # Convert minutes to seconds
 
+    # Print out the log file location at the end
+    print(f"THE LOG FILE LOCATION IS: {log_file}")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
     parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
@@ -79,7 +83,12 @@ if __name__ == "__main__":
 
     bucket_names = args.buckets
     wait_time = args.lifecycle_rules_wait
-    log_file = args.log_file or f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+    # Define the default log file path
+    log_dir = "./.script-logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_file = args.log_file or os.path.join(log_dir, f"script_run_{datetime.now().strftime('%Y_%m_%d___%H%M%S')}.log")
 
     main(bucket_names, wait_time, log_file)
 
