@@ -18,32 +18,32 @@ This repository contains scripts and configurations for cleaning up AWS S3 bucke
 
 ## Nested Scripts
 
-### Add Deny Policy
+#### Add Deny Policy
 
 Scripts to add deny policies to S3 buckets to prevent specific actions.
 
 - `add-bucket-policy.py`: Script to add a deny policy to an S3 bucket.
 - `deny-bucket-policy-template.json`: Template JSON for the deny policy.
 
-### Bucket Content Cleanup
+#### Bucket Content Cleanup
 
 Scripts to clean up the contents of an S3 bucket, including object versions and version delete markers.
 
 - `delete-s3-bucket-objects-versions.py`: Script to delete all objects and versions in an S3 bucket.
 
-### Delete Bucket
+#### Delete Bucket
 
 Scripts to delete an S3 bucket.
 
 - `delete-bucket.py`: Script to delete an S3 bucket after cleaning up its contents.
 
-### Delete Failed Multipart Uploads
+#### Delete Failed Multipart Uploads
 
 Scripts to identify and delete failed multipart uploads in S3 buckets.
 
 - `delete-failed-multipart-uploads.py`: Script to delete failed multipart uploads from an S3 bucket.
 
-### Set Lifecycle Rule
+#### Set Lifecycle Rule
 
 Scripts to set lifecycle policies for S3 buckets.
 
@@ -64,34 +64,6 @@ Main script to launch the bucket cleanup process.
 Detailed instructions for using the S3 bucket cleanup scripts.
 
 - `instruction---s3-bucket-deletion-cleanup.md`: Instructions for setting up and running the bucket cleanup scripts.
-
-## Glossary
-
-### A bucket key
-
-- **Definition**: (from a bucket-level point of view) path to an object in the bucket.
-    - Example:
-        - `my-bucket` -- a bucket name
-        - `photos/2024/vacation.jpg` -- a key, where the object is stored
-        - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path
-
-### Delete Marker
-
-- **Definition**: When versioning is enabled on a bucket, deleting an object does not actually remove its data. Instead, a delete marker is created.
-    - **Purpose**: Allows recovering deleted objects if needed.
-
-### Multipart Upload
-
-- **Definition**: A feature in Amazon S3 that allows uploading a single object as a set of parts. Each part is uploaded independently, and the parts can be uploaded in parallel to reduce the time taken to upload large files.
-    - **Potential Issues**: Such multipart uploads could fail, causing unexpected issues later on, for example, when trying to delete a bucket.
-    - **Example**: Listing multipart uploads in a bucket:
-        ```sh
-        aws s3api list-multipart-uploads --bucket my-bucket
-        ```
-
-## .gitignore
-
-- `.gitignore`: Git ignore file to exclude unnecessary files from the repository.
 
 ## Getting Started
 
@@ -127,11 +99,26 @@ Detailed instructions for using the S3 bucket cleanup scripts.
     python launch-bucket-cleanup.py <bucket-name>
     ```
 
-## License
+## Glossary
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### A bucket key
 
-## Acknowledgments
+- **Definition**: (from a bucket-level point of view) path to an object in the bucket.
+    - Example:
+        - `my-bucket` -- a bucket name
+        - `photos/2024/vacation.jpg` -- a key, where the object is stored
+        - `s3://my-bucket/photos/2024/vacation.jpg` -- the full path
 
-- AWS Boto3 Documentation
-- Community contributions
+### Delete Marker
+
+- **Definition**: When versioning is enabled on a bucket, deleting an object does not actually remove its data. Instead, a delete marker is created.
+    - **Purpose**: Allows recovering deleted objects if needed.
+
+### Multipart Upload
+
+- **Definition**: A feature in Amazon S3 that allows uploading a single object as a set of parts. Each part is uploaded independently, and the parts can be uploaded in parallel to reduce the time taken to upload large files.
+    - **Potential Issues**: Such multipart uploads could fail, causing unexpected issues later on, for example, when trying to delete a bucket.
+    - **Example**: Listing multipart uploads in a bucket:
+        ```sh
+        aws s3api list-multipart-uploads --bucket my-bucket
+        ```
