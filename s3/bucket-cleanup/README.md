@@ -22,34 +22,34 @@ This repository contains scripts and configurations for cleaning up AWS S3 bucke
 
 Scripts to add deny policies to S3 buckets to prevent specific actions.
 
-- `add-bucket-policy.py`: Script to add a deny policy to an S3 bucket.
-- `deny-bucket-policy-template.json`: Template JSON for the deny policy.
+- `add-deny-policy/add-bucket-policy.py`: Script to add a deny policy to an S3 bucket.
+- `add-deny-policy/deny-bucket-policy-template.json`: Template JSON for the deny policy.
 
 #### Bucket Content Cleanup
 
 Scripts to clean up the contents of an S3 bucket, including object versions and version delete markers.
 
-- `delete-s3-bucket-objects-versions.py`: Script to delete all objects and versions in an S3 bucket.
+- `bucket-content-cleanup/delete-s3-bucket-objects-versions.py`: Script to delete all objects and versions in an S3 bucket.
 
 #### Delete Bucket
 
 Scripts to delete an S3 bucket.
 
-- `delete-bucket.py`: Script to delete an S3 bucket after cleaning up its contents.
+- `delete-bucket/delete-bucket.py`: Script to delete an S3 bucket after cleaning up its contents.
 
 #### Delete Failed Multipart Uploads
 
 Scripts to identify and delete failed multipart uploads in S3 buckets.
 
-- `delete-failed-multipart-uploads.py`: Script to delete failed multipart uploads from an S3 bucket.
+- `delete-failed-multipart-uploads/delete-failed-multipart-uploads.py`: Script to delete failed multipart uploads from an S3 bucket.
 
 #### Set Lifecycle Rule
 
 Scripts to set lifecycle policies for S3 buckets.
 
-- `lifecycle-policy-01.json`: Example lifecycle policy JSON.
-- `lifecycle-policy-02.json`: Another example lifecycle policy JSON.
-- `set-lifecycle-rule.py`: Script to set lifecycle rules on an S3 bucket.
+- `set-lifecycle-rule/lifecycle-policy-01.json`: Example lifecycle policy JSON.
+- `set-lifecycle-rule/lifecycle-policy-02.json`: Another example lifecycle policy JSON.
+- `set-lifecycle-rule/set-lifecycle-rule.py`: Script to set lifecycle rules on an S3 bucket.
 
 ## Main Script
 
@@ -75,13 +75,25 @@ Detailed instructions for using the S3 bucket cleanup scripts.
 
 ### Installation
 
-1. Clone the repository:
+1. Install Python:
+    - On Windows, download and install from [python.org](https://www.python.org/downloads/).
+    - On macOS, you can use Homebrew:
+        ```sh
+        brew install python
+        ```
+    - On Linux, use your package manager, for example on Ubuntu:
+        ```sh
+        sudo apt-get update
+        sudo apt-get install python3
+        ```
+
+2. Clone the repository:
     ```sh
     git clone https://github.com/yourusername/s3-bucket-cleanup.git
     cd s3-bucket-cleanup
     ```
 
-2. Install the required Python libraries, if not installed already:
+3. Install the required Python libraries, if not installed already:
     ```sh
     pip install boto3
     ```
