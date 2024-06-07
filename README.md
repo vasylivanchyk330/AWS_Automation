@@ -79,7 +79,7 @@ Detailed instructions for using the S3 bucket cleanup scripts.
     cd s3-bucket-cleanup
     ```
 
-2. Install the required Python libraries:
+2. Install the required Python libraries, if not installed already:
     ```sh
     pip install boto3
     ```
@@ -90,18 +90,11 @@ Detailed instructions for using the S3 bucket cleanup scripts.
     ```sh
     aws configure
     ```
-
-2. Run the desired script:
+2. Run the script that initialized all other `s3/bucket-cleanup' scripts:
     ```sh
-    python path/to/script.py
+    cd s3/bucket-cleanup/
+    python launch-bucket-cleanup.py <bucket-name> 
     ```
-
-### Example
-
-To delete all objects and versions in an S3 bucket:
-```sh
-python bucket-content-cleanup/delete-s3-bucket-objects-versions.py
-
 
 
 
