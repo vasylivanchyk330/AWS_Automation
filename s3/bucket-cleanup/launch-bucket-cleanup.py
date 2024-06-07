@@ -2,23 +2,40 @@ import subprocess
 import time
 import argparse
 from datetime import datetime
+import logging
 
-def log_message(log_file, level, message):
-    """Log a message with a timestamp."""
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
-    with open(log_file, 'a') as log:
-        log.write(f"{timestamp} - {level} - {message}\n")
+def setup_logger(log_file):
+    """Setup logger to log messages to both console and file."""
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
 
-def run_script(script_path, script_args, log_file):
+    # Create handlers
+    console_handler = logging.StreamHandler()
+    file_handler = logging.FileHandler(log_file)
+
+    # Create formatters and add them to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S')
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+def run_script(script_path, script_args):
     """Run a script with arguments and wait for it to finish."""
     try:
         result = subprocess.run(["python", script_path] + script_args, check=True, capture_output=True, text=True)
-        log_message(log_file, "INFO", f"Output of {script_path}:\n{result.stdout}")
-        log_message(log_file, "INFO", result.stderr)
+        logging.info(f"Output of {script_path}:\n{result.stdout}")
+        if result.stderr:
+            logging.info(result.stderr)
     except subprocess.CalledProcessError as e:
-        log_message(log_file, "ERROR", f"Error running {script_path}:\n{e.stdout}\n{e.stderr}")
+        logging.error(f"Error running {script_path}:\n{e.stdout}\n{e.stderr}")
 
 def main(bucket_names, wait_time, log_file):
+    # Setup logger
+    setup_logger(log_file)
+
     # List of scripts to run in the given order with their respective arguments
     scripts = [
         ("add-deny-policy/add-bucket-policy.py", bucket_names + ["add-deny-policy/deny-bucket-policy-template.json"]),
@@ -29,13 +46,13 @@ def main(bucket_names, wait_time, log_file):
     ]
 
     for script_path, script_args in scripts:
-        log_message(log_file, "INFO", f"Running {script_path} with arguments {script_args}...")
-        run_script(script_path, script_args, log_file)
-        log_message(log_file, "INFO", f"Finished running {script_path}.\n")
+        logging.info(f"Running {script_path} with arguments {script_args}...")
+        run_script(script_path, script_args)
+        logging.info(f"Finished running {script_path}.\n")
 
         # If the current script is the lifecycle rule script, wait for the specified time
         if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and wait_time > 0:
-            log_message(log_file, "INFO", f"Waiting for {wait_time} minutes before proceeding to the next script...")
+            logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
             time.sleep(wait_time * 60)  # Convert minutes to seconds
 
 if __name__ == "__main__":
