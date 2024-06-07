@@ -3,19 +3,20 @@ import time
 import argparse
 from datetime import datetime
 
+def log_message(log_file, level, message):
+    """Log a message with a timestamp."""
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+    with open(log_file, 'a') as log:
+        log.write(f"{timestamp} - {level} - {message}\n")
+
 def run_script(script_path, script_args, log_file):
     """Run a script with arguments and wait for it to finish."""
     try:
         result = subprocess.run(["python", script_path] + script_args, check=True, capture_output=True, text=True)
-        with open(log_file, 'a') as log:
-            log.write(f"Output of {script_path}:\n")
-            log.write(result.stdout)
-            log.write(result.stderr)
+        log_message(log_file, "INFO", f"Output of {script_path}:\n{result.stdout}")
+        log_message(log_file, "INFO", result.stderr)
     except subprocess.CalledProcessError as e:
-        with open(log_file, 'a') as log:
-            log.write(f"Error running {script_path}:\n")
-            log.write(e.stdout)
-            log.write(e.stderr)
+        log_message(log_file, "ERROR", f"Error running {script_path}:\n{e.stdout}\n{e.stderr}")
 
 def main(bucket_names, wait_time, log_file):
     # List of scripts to run in the given order with their respective arguments
@@ -28,13 +29,13 @@ def main(bucket_names, wait_time, log_file):
     ]
 
     for script_path, script_args in scripts:
-        print(f"Running {script_path} with arguments {script_args}...")
+        log_message(log_file, "INFO", f"Running {script_path} with arguments {script_args}...")
         run_script(script_path, script_args, log_file)
-        print(f"Finished running {script_path}.\n")
+        log_message(log_file, "INFO", f"Finished running {script_path}.\n")
 
         # If the current script is the lifecycle rule script, wait for the specified time
         if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and wait_time > 0:
-            print(f"Waiting for {wait_time} minutes before proceeding to the next script...")
+            log_message(log_file, "INFO", f"Waiting for {wait_time} minutes before proceeding to the next script...")
             time.sleep(wait_time * 60)  # Convert minutes to seconds
 
 if __name__ == "__main__":
@@ -50,5 +51,3 @@ if __name__ == "__main__":
     log_file = args.log_file or f"script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     main(bucket_names, wait_time, log_file)
-
-
