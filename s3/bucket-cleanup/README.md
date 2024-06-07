@@ -33,6 +33,12 @@ Scripts to clean up the contents of an S3 bucket, including object versions and 
 
 - `bucket-content-cleanup/delete-s3-bucket-objects-versions.py`: Script to delete all objects and versions in an S3 bucket.
 
+**Pagination and ThreadPoolExecutor**
+
+- **Pagination**: The `paginator` is used to handle large sets of data that cannot be retrieved in a single API call. In the context of S3 operations, pagination allows the script to efficiently manage and process large numbers of objects by retrieving them in batches (pages). This prevents memory overload and ensures that the script can handle large buckets with many objects or versions.
+
+- **ThreadPoolExecutor**: The `ThreadPoolExecutor` from the `concurrent.futures` module is used to perform concurrent execution of function calls using a pool of threads. In this script, it is used to delete objects and versions in parallel, significantly speeding up the cleanup process. By submitting multiple deletion tasks to the thread pool, the script can handle multiple delete operations simultaneously, improving performance and reducing the total time required for cleanup.
+
 #### Delete Bucket
 
 Scripts to delete an S3 bucket.
