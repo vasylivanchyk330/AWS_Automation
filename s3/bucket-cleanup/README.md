@@ -74,6 +74,14 @@ Main script to launch the bucket cleanup process.
 - `--lifecycle-rules-wait` or `-w`: Optional argument specifying the number of minutes to wait after setting lifecycle rules. Default is 0.
 - `--log-file` or `-l`: Optional argument specifying the log file to store the output. If not provided, a log file will be created with the name format `./.script-logs/script_<timestamp>.log`; use `ls -al` to see `./.script-logs/`.
 
+#### Script launch with large `--lifecycle-rules-wait` value
+
+If you need to set the timer to wait till lifecycle rules kicks in, use `--lifecycle-rules-wait` option. If you set a large value for the option, the script run might be interapted by the browser session expiration. To overcome this, run the script using `nohup` terminal window.
+
+`nohup python launch-bucket-cleanup.py bucket1 bucket2 bucket3 --lifecycle-rules-wait 5 &`
+
+In this manner, the script will be executing regardless any browser session expiration interaptions. 
+To go back to the `nohup` terminal window later on, run the command ``
 
 ## Log Location
 
