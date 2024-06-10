@@ -48,12 +48,14 @@ def get_bucket_versions_stats(bucket_name):
     )
     if result.stdout.strip():
         sizes = json.loads(result.stdout)
-        version_sizes = sizes['Versions'] if 'Versions' in sizes else []
-        marker_sizes = sizes['DeleteMarkers'] if 'DeleteMarkers' in sizes else []
-        total_version_size = sum(version_sizes)
+        version_sizes = sizes.get('Versions', [])
+        marker_sizes = sizes.get('DeleteMarkers', [])
+        
+        total_version_size = sum(version_sizes) if version_sizes else 0
         total_version_count = len(version_sizes)
-        total_marker_size = sum(marker_sizes)
+        total_marker_size = sum(marker_sizes) if marker_sizes else 0
         total_marker_count = len(marker_sizes)
+        
         return total_version_count, total_version_size, total_marker_count, total_marker_size
     return 0, 0, 0, 0
 
