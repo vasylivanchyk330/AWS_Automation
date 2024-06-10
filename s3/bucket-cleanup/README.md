@@ -39,6 +39,19 @@ Scripts to clean up the contents of an S3 bucket, including object versions and 
 
 - **ThreadPoolExecutor**: The `ThreadPoolExecutor` from the `concurrent.futures` module is used to perform concurrent execution of function calls using a pool of threads. In this script, it is used to delete objects and versions in parallel, significantly speeding up the cleanup process. By submitting multiple deletion tasks to the thread pool, the script can handle multiple delete operations simultaneously, improving performance and reducing the total time required for cleanup.
 
+- **Exponatial Backoffs with Jitter**: Exponential backoff with jitter is a technique used to improve the reliability and performance of retry mechanisms. When a request fails, the system waits for an exponentially increasing amount of time before retrying the request. Adding jitter (randomness) helps to prevent synchronized retries from multiple clients, which can lead to further congestion and failures. Here, AWS reacts on too many delete requests throwing the `SlowDown` error. To overcome this, in the script, a quite simple `except` structure is used:
+```
+            except s3.exceptions.ClientError as e:
+                error_code = e.response['Error']['Code']
+                if error_code == 'SlowDown':
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    logging.error(f"Error deleting objects in page: {e}. Retrying in {delay:.2f} seconds...")
+                    time.sleep(delay)
+                else:
+                    logging.error(f"Error deleting objects in page: {e}. Not retrying.")
+                    return 0
+```
+
 #### 3. Delete Bucket
 
 Scripts to delete an S3 bucket.
