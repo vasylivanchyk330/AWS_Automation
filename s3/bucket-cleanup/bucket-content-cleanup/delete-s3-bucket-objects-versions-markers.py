@@ -41,15 +41,15 @@ def get_bucket_stats(bucket_name):
 def get_bucket_versions_stats(bucket_name):
     """Get the total number and size of object versions and delete markers in a bucket using AWS CLI."""
     result = subprocess.run(
-        ["aws", "s3api", "list-object-versions", "--bucket", bucket_name, "--query", "[Versions[].Size, DeleteMarkers[].Size]"],
+        ["aws", "s3api", "list-object-versions", "--bucket", bucket_name, "--query", "{Versions: Versions[].Size, DeleteMarkers: DeleteMarkers[].Size}"],
         capture_output=True,
         text=True,
         check=True
     )
     if result.stdout.strip():
         sizes = json.loads(result.stdout)
-        version_sizes = sizes[0] if sizes[0] else []
-        marker_sizes = sizes[1] if sizes[1] else []
+        version_sizes = sizes['Versions'] if 'Versions' in sizes else []
+        marker_sizes = sizes['DeleteMarkers'] if 'DeleteMarkers' in sizes else []
         total_version_size = sum(version_sizes)
         total_version_count = len(version_sizes)
         total_marker_size = sum(marker_sizes)
@@ -111,7 +111,6 @@ def delete_all_versions(bucket_name):
 
     end_time = time.time()
     duration = end_time - start_time
-    logging.info(f"Deleted {object_count} versions and delete markers from bucket '{bucket_name}' in {duration:.2f} seconds.")
     return object_count, duration
 
 def delete_all_objects(bucket_name):
@@ -158,14 +157,6 @@ if __name__ == "__main__":
             pre_version_count, pre_version_size, pre_marker_count, pre_marker_size = get_bucket_versions_stats(bucket_name)
             total_bucket_size_before = pre_delete_size + pre_version_size + pre_marker_size
 
-            logging.info(f"Total Object Count Before Deletion: {pre_delete_count}")
-            logging.info(f"Total Object Size Before Deletion: {bytes_to_human_readable(pre_delete_size)}")
-            logging.info(f"Total Version Count Before Deletion: {pre_version_count}")
-            logging.info(f"Total Version Size Before Deletion: {bytes_to_human_readable(pre_version_size)}")
-            logging.info(f"Total Delete Marker Count Before Deletion: {pre_marker_count}")
-            logging.info(f"Total Delete Marker Size Before Deletion: {bytes_to_human_readable(pre_marker_size)}")
-            logging.info(f"Total Bucket Size Before Deletion: {bytes_to_human_readable(total_bucket_size_before)}")
-
             obj_count, obj_duration = delete_all_objects(bucket_name)
             version_count, version_duration = delete_all_versions(bucket_name)
 
@@ -173,6 +164,7 @@ if __name__ == "__main__":
             post_version_count, post_version_size, post_marker_count, post_marker_size = get_bucket_versions_stats(bucket_name)
             total_bucket_size_after = post_delete_size + post_version_size + post_marker_size
 
+            # Log only the stats after deletion
             logging.info(f"Total Object Count After Deletion: {post_delete_count}")
             logging.info(f"Total Object Size After Deletion: {bytes_to_human_readable(post_delete_size)}")
             logging.info(f"Total Version Count After Deletion: {post_version_count}")
@@ -180,7 +172,6 @@ if __name__ == "__main__":
             logging.info(f"Total Delete Marker Count After Deletion: {post_marker_count}")
             logging.info(f"Total Delete Marker Size After Deletion: {bytes_to_human_readable(post_marker_size)}")
             logging.info(f"Total Bucket Size After Deletion: {bytes_to_human_readable(total_bucket_size_after)}")
-
             logging.info(f"Time to delete objects: {obj_duration:.2f} seconds")
             logging.info(f"Time to delete versions and delete markers: {version_duration:.2f} seconds")
         else:
