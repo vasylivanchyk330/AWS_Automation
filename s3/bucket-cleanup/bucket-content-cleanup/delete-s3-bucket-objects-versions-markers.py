@@ -11,22 +11,14 @@ import boto3
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Create the S3 client once and reuse it
 s3 = boto3.client('s3')
 
 def bucket_exists(bucket_name):
     """Check if a bucket exists using AWS CLI."""
     try:
         result = subprocess.run(["aws", "s3api", "head-bucket", "--bucket", bucket_name], capture_output=True, text=True, check=True)
-        if result.returncode == 0:
-            bucket_info = subprocess.run(["aws", "s3api", "get-bucket-location", "--bucket", bucket_name], capture_output=True, text=True, check=True)
-            bucket_info_json = json.loads(bucket_info.stdout)
-            bucket_region = bucket_info_json.get('LocationConstraint', 'us-east-1')
-            access_point_alias = False  # This would typically be fetched through another call if available
-            logging.info(f"Bucket Name: {bucket_name}")
-            logging.info(f"Bucket Region: {bucket_region}")
-            logging.info(f"AccessPointAlias: {access_point_alias}")
-            return True
-        return False
+        return result.returncode == 0
     except subprocess.CalledProcessError:
         return False
 
@@ -96,22 +88,30 @@ def delete_all_versions(bucket_name):
     start_time = time.time()
 
     with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
-        futures = []
-        for page in paginator.paginate(Bucket=bucket_name):
-            objects_to_delete = []
-            if 'Versions' in page:
-                objects_to_delete.extend([{'Key': version['Key'], 'VersionId': version['VersionId']} for version in page['Versions']])
-            if 'DeleteMarkers' in page:
-                objects_to_delete.extend([{'Key': marker['Key'], 'VersionId': marker['VersionId']} for marker in page['DeleteMarkers']])
+        while True:
+            futures = []
+            pages_deleted = 0
+            for page in paginator.paginate(Bucket=bucket_name):
+                objects_to_delete = []
+                if 'Versions' in page:
+                    objects_to_delete.extend([{'Key': version['Key'], 'VersionId': version['VersionId']} for version in page['Versions']])
+                if 'DeleteMarkers' in page:
+                    objects_to_delete.extend([{'Key': marker['Key'], 'VersionId': marker['VersionId']} for marker in page['DeleteMarkers']])
 
-            if objects_to_delete:
-                futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete))
+                if objects_to_delete:
+                    futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete))
 
-        for future in futures:
-            object_count += future.result()
+            for future in futures:
+                pages_deleted += future.result()
+                object_count += future.result()
+
+            # Check if any pages were deleted, if none were deleted break the loop
+            if pages_deleted == 0:
+                break
 
     end_time = time.time()
     duration = end_time - start_time
+    logging.info(f"Deleted {object_count} versions and delete markers from bucket '{bucket_name}' in {duration:.2f} seconds.")
     return object_count, duration
 
 def delete_all_objects(bucket_name):
