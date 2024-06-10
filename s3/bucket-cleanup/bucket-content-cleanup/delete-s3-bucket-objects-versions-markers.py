@@ -4,6 +4,7 @@ import subprocess
 import logging
 import json
 import math
+import random
 from concurrent.futures import ThreadPoolExecutor
 import boto3
 
@@ -65,17 +66,27 @@ def get_bucket_versions_stats(bucket_name):
     return 0, 0, 0, 0
 
 def delete_objects_in_page(bucket_name, objects):
-    """Delete a batch of objects in a bucket."""
+    """Delete a batch of objects in a bucket with exponential backoff."""
     if objects:
-        try:
-            response = s3.delete_objects(Bucket=bucket_name, Delete={'Objects': objects})
-            deleted = response.get('Deleted', [])
-            if 'Errors' in response:
-                logging.error(f"Errors: {response['Errors']}")
-            return len(deleted)
-        except s3.exceptions.ClientError as e:
-            logging.error(f"Error deleting objects in page: {e}")
-            return 0
+        max_retries = 5
+        base_delay = 1  # starting delay in seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = s3.delete_objects(Bucket=bucket_name, Delete={'Objects': objects})
+                deleted = response.get('Deleted', [])
+                if 'Errors' in response:
+                    logging.error(f"Errors: {response['Errors']}")
+                return len(deleted)
+            except s3.exceptions.ClientError as e:
+                error_code = e.response['Error']['Code']
+                if error_code == 'SlowDown':
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    logging.error(f"Error deleting objects in page: {e}. Retrying in {delay:.2f} seconds...")
+                    time.sleep(delay)
+                else:
+                    logging.error(f"Error deleting objects in page: {e}. Not retrying.")
+                    return 0
     return 0
 
 def delete_all_versions(bucket_name):
@@ -84,7 +95,7 @@ def delete_all_versions(bucket_name):
     object_count = 0
     start_time = time.time()
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
         futures = []
         for page in paginator.paginate(Bucket=bucket_name):
             objects_to_delete = []
@@ -109,7 +120,7 @@ def delete_all_objects(bucket_name):
     object_count = 0
     start_time = time.time()
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
         futures = []
         for page in paginator.paginate(Bucket=bucket_name):
             if 'Contents' in page:
