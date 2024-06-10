@@ -40,24 +40,33 @@ def get_bucket_stats(bucket_name):
 
 def get_bucket_versions_stats(bucket_name):
     """Get the total number and size of object versions and delete markers in a bucket using AWS CLI."""
-    result = subprocess.run(
-        ["aws", "s3api", "list-object-versions", "--bucket", bucket_name, "--query", "{Versions: Versions[].Size, DeleteMarkers: DeleteMarkers[].Size}"],
-        capture_output=True,
-        text=True,
-        check=True
-    )
-    if result.stdout.strip():
-        sizes = json.loads(result.stdout)
-        version_sizes = sizes.get('Versions', [])
-        marker_sizes = sizes.get('DeleteMarkers', [])
-        
-        total_version_size = sum(version_sizes) if version_sizes else 0
-        total_version_count = len(version_sizes)
-        total_marker_size = sum(marker_sizes) if marker_sizes else 0
-        total_marker_count = len(marker_sizes)
-        
-        return total_version_count, total_version_size, total_marker_count, total_marker_size
-    return 0, 0, 0, 0
+    version_count = 0
+    version_size = 0
+    marker_count = 0
+    marker_size = 0
+    
+    try:
+        result = subprocess.run(
+            ["aws", "s3api", "list-object-versions", "--bucket", bucket_name],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        if result.stdout.strip():
+            versions_info = json.loads(result.stdout)
+            
+            if 'Versions' in versions_info:
+                version_count = len(versions_info['Versions'])
+                version_size = sum(obj['Size'] for obj in versions_info['Versions'])
+            
+            if 'DeleteMarkers' in versions_info:
+                marker_count = len(versions_info['DeleteMarkers'])
+                marker_size = 0  # DeleteMarkers do not have size attribute
+
+        return version_count, version_size, marker_count, marker_size
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error fetching bucket versions stats: {e}")
+        return 0, 0, 0, 0
 
 def delete_objects_in_page(bucket_name, objects):
     """Delete a batch of objects in a bucket with exponential backoff."""
@@ -184,3 +193,4 @@ if __name__ == "__main__":
 
     # Print summary of operations
     logging.info(f"Total script duration: {total_duration:.2f} seconds")
+
