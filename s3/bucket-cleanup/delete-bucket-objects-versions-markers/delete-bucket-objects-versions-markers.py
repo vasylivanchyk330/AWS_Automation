@@ -146,7 +146,7 @@ def delete_all_objects(bucket_name):
 
 def bytes_to_human_readable(size_in_bytes):
     """Convert bytes to a human-readable format."""
-    if size_in_bytes == 0:
+    if size_in_bytes is None:
         return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB")
     i = int(math.floor(math.log(size_in_bytes, 1024)))
@@ -164,12 +164,8 @@ def main():
 
     for bucket_name in bucket_names:
         if bucket_exists(bucket_name):
-            pre_delete_count, pre_delete_size = get_bucket_stats(bucket_name)
-            pre_version_count, pre_version_size, pre_marker_count, pre_marker_size = get_bucket_versions_stats(bucket_name)
-            total_bucket_size_before = pre_delete_size + pre_version_size + pre_marker_size
-
-            obj_count, obj_duration = delete_all_objects(bucket_name)
-            version_count, version_duration = delete_all_versions(bucket_name)
+            delete_all_objects(bucket_name)
+            delete_all_versions(bucket_name)
 
             post_delete_count, post_delete_size = get_bucket_stats(bucket_name)
             post_version_count, post_version_size, post_marker_count, post_marker_size = get_bucket_versions_stats(bucket_name)
