@@ -56,7 +56,23 @@ def run_script(script_path, script_args, retries=10, delay=10):
                     return False
     return False
 
-def main(bucket_names, wait_time, log_file):
+def main():
+    parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
+    parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
+    parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
+    parser.add_argument("--log-file", "-l", type=str, help="Log file to store the output")
+
+    args = parser.parse_args()
+
+    bucket_names = args.buckets
+    wait_time = args.lifecycle_rules_wait
+
+    # Define the default log file path
+    log_dir = "./.script-logs"
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_file = args.log_file or os.path.join(log_dir, f"script_run_{datetime.now().strftime('%Y_%m_%d___%H%M%S')}.log")
+
     # Setup logger
     setup_logger(log_file)
 
@@ -87,20 +103,4 @@ def main(bucket_names, wait_time, log_file):
     print(f"THE LOG FILE LOCATION IS: {log_file}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
-    parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
-    parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
-    parser.add_argument("--log-file", "-l", type=str, help="Log file to store the output")
-
-    args = parser.parse_args()
-
-    bucket_names = args.buckets
-    wait_time = args.lifecycle_rules_wait
-
-    # Define the default log file path
-    log_dir = "./.script-logs"
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    log_file = args.log_file or os.path.join(log_dir, f"script_run_{datetime.now().strftime('%Y_%m_%d___%H%M%S')}.log")
-
-    main(bucket_names, wait_time, log_file)
+    main()
