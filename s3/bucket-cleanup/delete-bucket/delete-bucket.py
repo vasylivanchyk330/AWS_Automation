@@ -29,8 +29,13 @@ def delete_bucket(bucket_name):
     except s3.exceptions.ClientError as e:
         logging.error(f"Error deleting bucket '{bucket_name}': {e}")
 
-def main(bucket_names):
+def main():
     """Main function to check and delete empty buckets."""
+    if len(sys.argv) < 2:
+        logging.error("Usage: python delete_s3_buckets_if_empty.py <bucket-name1> <bucket-name2> ...")
+        sys.exit(1)
+
+    bucket_names = sys.argv[1:]
     for bucket_name in bucket_names:
         if bucket_exists(bucket_name):
             if is_bucket_empty(bucket_name):
@@ -41,9 +46,4 @@ def main(bucket_names):
             logging.warning(f"Bucket '{bucket_name}' does not exist.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        logging.error("Usage: python delete_s3_buckets_if_empty.py <bucket-name1> <bucket-name2> ...")
-        sys.exit(1)
-
-    bucket_names = sys.argv[1:]
-    main(bucket_names)
+    main()
