@@ -154,7 +154,7 @@ def bytes_to_human_readable(size_in_bytes):
     s = round(size_in_bytes / p, 2)
     return f"{s} {size_name[i]}"
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) < 2:
         logging.error("Usage: python delete_s3_objects.py <bucket-name1> <bucket-name2> ...")
         sys.exit(1)
@@ -194,3 +194,5 @@ if __name__ == "__main__":
     # Print summary of operations
     logging.info(f"Total script duration: {total_duration:.2f} seconds")
 
+if __name__ == "__main__":
+    main()
