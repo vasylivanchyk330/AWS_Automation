@@ -95,7 +95,6 @@ def delete_objects_in_page(bucket_name, objects):
 def delete_all_versions(bucket_name):
     """Delete all object versions and delete markers in a bucket."""
     paginator = s3.get_paginator('list_object_versions')
-    object_count = 0
     start_time = time.time()
 
     with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
@@ -114,7 +113,6 @@ def delete_all_versions(bucket_name):
 
             for future in futures:
                 pages_deleted += future.result()
-                object_count += future.result()
 
             # Check if any pages were deleted, if none were deleted break the loop
             if pages_deleted == 0:
@@ -122,7 +120,7 @@ def delete_all_versions(bucket_name):
 
     end_time = time.time()
     duration = end_time - start_time
-    return object_count, duration
+    return duration
 
 def delete_all_objects(bucket_name):
     """Delete all objects in a bucket."""
@@ -143,7 +141,6 @@ def delete_all_objects(bucket_name):
     end_time = time.time()
     duration = end_time - start_time
     return duration
-
 
 def bytes_to_human_readable(size_in_bytes):
     """Convert bytes to a human-readable format."""
