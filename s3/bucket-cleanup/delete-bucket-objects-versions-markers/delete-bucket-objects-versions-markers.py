@@ -17,8 +17,13 @@ s3 = boto3.client('s3')
 def bucket_exists(bucket_name):
     """Check if a bucket exists using AWS CLI."""
     try:
-        result = subprocess.run(["aws", "s3api", "head-bucket", "--bucket", bucket_name], capture_output=True, text=True, check=True)
-        return result.returncode == 0
+        result = subprocess.run(
+            ["aws", "s3api", "head-bucket", "--bucket", bucket_name], 
+            capture_output=True, # captures stdout and stderr
+            text=True, # output should be treated as text (strings) rather than bytes
+            check=True # raise a CalledProcessError exception if the command returns a non-zero exit status (indicating failure)
+        )
+        return result.returncode == 0 # return UNIX-like system code 0, succeded
     except subprocess.CalledProcessError:
         return False
 
@@ -30,8 +35,8 @@ def get_bucket_stats(bucket_name):
         text=True,
         check=True
     )
-    if result.stdout.strip():
-        sizes = json.loads(result.stdout)
+    if result.stdout.strip(): # if there is any output from the command after removing any leading and trailing whitespace
+        sizes = json.loads(result.stdout) # parses the JSON-formatted output from the command into a Python list
         if sizes:
             total_size = sum(sizes)
             total_count = len(sizes)
@@ -61,7 +66,7 @@ def get_bucket_versions_stats(bucket_name):
             
             if 'DeleteMarkers' in versions_info:
                 marker_count = len(versions_info['DeleteMarkers'])
-                marker_size = 0  # DeleteMarkers do not have size attribute
+                marker_size = 0  # DeleteMarkers do not have size attribute; added for readibility
 
         return version_count, version_size, marker_count, marker_size
     except subprocess.CalledProcessError as e:
@@ -80,26 +85,30 @@ def delete_objects_in_page(bucket_name, objects):
                 deleted = response.get('Deleted', [])
                 if 'Errors' in response:
                     logging.error(f"Errors: {response['Errors']}")
-                return len(deleted)
+                return len(deleted) # number of deleted objects
             except s3.exceptions.ClientError as e:
                 error_code = e.response['Error']['Code']
-                if error_code == 'SlowDown':
+                if error_code == 'SlowDown': # if too much of delete-object requests ...
                     delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
                     logging.error(f"Error deleting objects in page: {e}. Retrying in {delay:.2f} seconds...")
-                    time.sleep(delay)
+                    time.sleep(delay) # ... implement delay with exponential backoff
                 else:
                     logging.error(f"Error deleting objects in page: {e}. Not retrying.")
-                    return 0
-    return 0
+                    return 0 # number of deleted objects
+    return 0 # number of deleted objects
 
 def delete_all_versions(bucket_name):
     """Delete all object versions and delete markers in a bucket."""
-    paginator = s3.get_paginator('list_object_versions')
+    # To overcome the 1000 records limitation, use paginator
+    paginator = s3.get_paginator('list_object_versions') 
     start_time = time.time()
 
-    with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
+    # To make the page deleting concurrently, use ThreadPoolExecutor.
+    # Limiting the number of threads helps manage system resources more efficiently. 
+    # Too many threads can lead to excessive context switching, increased memory usage, and potential system instability.
+    with ThreadPoolExecutor(max_workers=5) as executor:  
         while True:
-            futures = []
+            futures = [] # initializes an empty list to store future objects representing the asynchronous deletion task
             pages_deleted = 0
             for page in paginator.paginate(Bucket=bucket_name):
                 objects_to_delete = []
@@ -109,8 +118,9 @@ def delete_all_versions(bucket_name):
                     objects_to_delete.extend([{'Key': marker['Key'], 'VersionId': marker['VersionId']} for marker in page['DeleteMarkers']])
 
                 if objects_to_delete:
-                    futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete))
+                    futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete)) # delete paginated objects concurrently
 
+            # Wait for all futures to complete
             for future in futures:
                 pages_deleted += future.result()
 
@@ -151,13 +161,14 @@ def bytes_to_human_readable(size_in_bytes):
     p = math.pow(1024, i)
     s = round(size_in_bytes / p, 2)
     return f"{s} {size_name[i]}"
+
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2: # checks if at least one bucket name is provided, if not then:
         logging.error("Usage: python delete_s3_objects.py <bucket-name1> <bucket-name2> ...")
         sys.exit(1)
 
     start_time = time.time()
-    bucket_names = sys.argv[1:]
+    bucket_names = sys.argv[1:] # assing the list of arguments (bucket names) to the var bucket_names
 
     for bucket_name in bucket_names:
         if bucket_exists(bucket_name):
