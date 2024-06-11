@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 import logging
 import os
+import sys
 
 def setup_logger(log_file):
     """Setup logger to log messages to both console and file."""
@@ -86,6 +87,8 @@ def main():
         ("delete-bucket/delete-bucket.py", bucket_names)
     ]
 
+    success = True  # Track the success of script runs
+
     for script_path, script_args in scripts:
         logging.info(f"STARTING SCRIPT RUN -- {script_path}")
         logging.info(f"Running {script_path} with arguments {script_args}...")
@@ -93,6 +96,7 @@ def main():
             logging.info(f"Finished running {script_path}.\n")
         else:
             logging.error(f"Failed to run {script_path} after maximum retries.\n")
+            success = False
             break
 
         # If the current script is the lifecycle rule script, wait for the specified time
@@ -100,8 +104,19 @@ def main():
             logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
             time.sleep(wait_time * 60)  # Convert minutes to seconds
 
+    # Rename the log file if any script failed; assign exit_code value for later call
+    if not success:
+        error_log_file = log_file.replace('.log', '__errorred.log')
+        os.rename(log_file, error_log_file)
+        log_file = error_log_file
+        exit_code = 1
+    else:
+        exit_code = 0
+
     # Print out the log file location at the end
     print(f"THE LOG FILE LOCATION IS: {log_file}")
-
+    
+    sys.exit(exit_code)
+   
 if __name__ == "__main__":
     main()
