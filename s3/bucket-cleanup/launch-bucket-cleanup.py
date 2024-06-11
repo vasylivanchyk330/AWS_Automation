@@ -25,8 +25,8 @@ def setup_logger(log_file):
 
 def log_unique_lines(log_func, message):
     """Log each line in the message uniquely."""
-    seen_lines = set()
-    for line in message.splitlines():
+    seen_lines = set() # to keep track of lines that have already been logged
+    for line in message.splitlines(): # splits the message into individual lines 
         if line not in seen_lines:
             log_func(line)
             seen_lines.add(line)
@@ -57,6 +57,7 @@ def run_script(script_path, script_args, retries=5, delay=10):
     return False
 
 def main():
+    # parses arguments
     parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
     parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
     parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")

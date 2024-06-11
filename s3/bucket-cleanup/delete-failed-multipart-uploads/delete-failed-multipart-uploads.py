@@ -22,7 +22,7 @@ def delete_failed_multipart_uploads(bucket_name):
         sys.exit(1)
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("Usage: python script.py <bucket-name>")
         sys.exit(1)
 
