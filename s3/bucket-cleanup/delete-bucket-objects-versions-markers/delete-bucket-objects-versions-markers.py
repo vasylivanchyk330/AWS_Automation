@@ -127,7 +127,6 @@ def delete_all_versions(bucket_name):
 def delete_all_objects(bucket_name):
     """Delete all objects in a bucket."""
     paginator = s3.get_paginator('list_objects_v2')
-    object_count = 0
     start_time = time.time()
 
     with ThreadPoolExecutor(max_workers=5) as executor:  # Limiting the number of threads
@@ -137,12 +136,14 @@ def delete_all_objects(bucket_name):
                 objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
                 futures.append(executor.submit(delete_objects_in_page, bucket_name, objects_to_delete))
 
+        # Wait for all futures to complete
         for future in futures:
-            object_count += future.result()
+            future.result()
 
     end_time = time.time()
     duration = end_time - start_time
-    return object_count, duration
+    return duration
+
 
 def bytes_to_human_readable(size_in_bytes):
     """Convert bytes to a human-readable format."""
@@ -153,7 +154,6 @@ def bytes_to_human_readable(size_in_bytes):
     p = math.pow(1024, i)
     s = round(size_in_bytes / p, 2)
     return f"{s} {size_name[i]}"
-
 def main():
     if len(sys.argv) < 2:
         logging.error("Usage: python delete_s3_objects.py <bucket-name1> <bucket-name2> ...")
@@ -164,8 +164,8 @@ def main():
 
     for bucket_name in bucket_names:
         if bucket_exists(bucket_name):
-            delete_all_objects(bucket_name)
-            delete_all_versions(bucket_name)
+            obj_duration = delete_all_objects(bucket_name)
+            version_duration = delete_all_versions(bucket_name)
 
             post_delete_count, post_delete_size = get_bucket_stats(bucket_name)
             post_version_count, post_version_size, post_marker_count, post_marker_size = get_bucket_versions_stats(bucket_name)
