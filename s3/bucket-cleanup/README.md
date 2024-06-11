@@ -96,10 +96,11 @@ If you need to set the timer to wait till lifecycle rules kicks in, use `--lifec
 In this manner, the script will be executing regardless any browser session expiration interaptions. 
 To go back to the `nohup` terminal window later on, run the command ``
 
-## Log Location
+## Logs and Log Location
 
 The script logs the output of each step to a log file. By default, the log location is `./.script-logs/`; the log file is named `script_<timestamp>.log`. You can specify a custom log file location using the `--log-file` argument when running the script.
 
+If any script fails, the log file is renamed to end with `__errorred.log`.
 
 ## Getting Started
 
