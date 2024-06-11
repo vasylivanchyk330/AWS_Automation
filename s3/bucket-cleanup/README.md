@@ -100,7 +100,9 @@ To go back to the `nohup` terminal window later on, run the command ``
 
 The script logs the output of each step to a log file. By default, the log location is `./.script-logs/`; the log file is named `script_<timestamp>.log`. You can specify a custom log file location using the `--log-file` argument when running the script.
 
-If the `launch-bucket-cleanup.py` exits with UNIX-like system exit code `1`, which basically means if the script fails, the log file is renamed to end with `__errorred.log`.
+If the `launch-bucket-cleanup.py` exits with UNIX-like system exit code `1`, which basically means if the script fails, the log file is renamed to end with `__errorred.log`. The example:
+![image](https://github.com/vasylivanchyk330/AWS_Automation/assets/60069876/df7f2eba-625d-47e6-b4bf-98ee3c9cb69b)
+
 
 ## Getting Started
 
