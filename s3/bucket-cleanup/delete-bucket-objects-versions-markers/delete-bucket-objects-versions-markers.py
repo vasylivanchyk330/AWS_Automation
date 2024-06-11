@@ -146,7 +146,7 @@ def delete_all_objects(bucket_name):
 
 def bytes_to_human_readable(size_in_bytes):
     """Convert bytes to a human-readable format."""
-    if size_in_bytes is None:
+    if size_in_bytes is None or size_in_bytes == 0:
         return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB")
     i = int(math.floor(math.log(size_in_bytes, 1024)))
