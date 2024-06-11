@@ -1,10 +1,10 @@
 import subprocess
 import time
 import argparse
-from datetime import datetime
 import logging
 import os
 import sys
+from datetime import datetime
 
 def setup_logger(log_file):
     """Setup logger to log messages to both console and file."""
@@ -78,31 +78,37 @@ def main():
     # Setup logger
     setup_logger(log_file)
 
-    # List of scripts to run in the given order with their respective arguments
-    scripts = [
-        ("add-deny-policy/add-bucket-policy.py", bucket_names + ["add-deny-policy/deny-bucket-policy-template.json"]),
-        ("set-lifecycle-rule/set-lifecycle-rule.py", bucket_names + ["set-lifecycle-rule/lifecycle-policy-01.json", "set-lifecycle-rule/lifecycle-policy-02.json"]),
-        ("delete-bucket-objects-versions-markers/delete-bucket-objects-versions-markers.py", bucket_names),
-        ("delete-failed-multipart-uploads/delete-failed-multipart-uploads.py", bucket_names),
-        ("delete-bucket/delete-bucket.py", bucket_names)
-    ]
-
     success = True  # Track the success of script runs
 
-    for script_path, script_args in scripts:
-        logging.info(f"STARTING SCRIPT RUN -- {script_path}")
-        logging.info(f"Running {script_path} with arguments {script_args}...")
-        if run_script(script_path, script_args):
-            logging.info(f"Finished running {script_path}.\n")
-        else:
-            logging.error(f"Failed to run {script_path} after maximum retries.\n")
-            success = False
-            break
+    for bucket_name in bucket_names:
+        logging.info(f"Processing bucket: {bucket_name}")
 
-        # If the current script is the lifecycle rule script, wait for the specified time
-        if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and wait_time > 0:
-            logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
-            time.sleep(wait_time * 60)  # Convert minutes to seconds
+        # List of scripts to run in the given order with their respective arguments
+        scripts = [
+            ("add-deny-policy/add-bucket-policy.py", [bucket_name, "add-deny-policy/deny-bucket-policy-template.json"]),
+            ("set-lifecycle-rule/set-lifecycle-rule.py", [bucket_name, "set-lifecycle-rule/lifecycle-policy-01.json", "set-lifecycle-rule/lifecycle-policy-02.json"]),
+            ("delete-bucket-objects-versions-markers/delete-bucket-objects-versions-markers.py", [bucket_name]),
+            ("delete-failed-multipart-uploads/delete-failed-multipart-uploads.py", [bucket_name]),
+            ("delete-bucket/delete-bucket.py", [bucket_name])
+        ]
+
+        for script_path, script_args in scripts:
+            logging.info(f"STARTING SCRIPT RUN -- {script_path}")
+            logging.info(f"Running {script_path} with arguments {script_args}...")
+            if run_script(script_path, script_args):
+                logging.info(f"Finished running {script_path}.\n")
+            else:
+                logging.error(f"Failed to run {script_path} after maximum retries.\n")
+                success = False
+                break
+
+            # If the current script is the lifecycle rule script, wait for the specified time
+            if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and wait_time > 0:
+                logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
+                time.sleep(wait_time * 60)  # Convert minutes to seconds
+
+        if not success:
+            break
 
     # Rename the log file if any script failed; assign exit_code value for later call
     if not success:
@@ -117,6 +123,6 @@ def main():
     print(f"THE LOG FILE LOCATION IS: {log_file}")
     
     sys.exit(exit_code)
-   
+
 if __name__ == "__main__":
     main()
