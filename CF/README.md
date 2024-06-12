@@ -19,6 +19,16 @@ To use the script, run it from the command line with the appropriate arguments.
 python delete-CF-stack-base-on-date-time.py <cutoff-date-time> [--exclude-stacks <stack1,stack2,... or exclude_stacks.txt>] [--force]
 ```
 
+By defualt, the script will prompt a user confirm each stack deletion manually. Here is an example of such prompt:
+
+```arduino
+Found 2 stacks created after 2024-06-10T00:00:00Z
+Are you sure you want to delete the stack stack_name1? (yes/no): yes
+Initiated deletion of stack: stack_name1
+Are you sure you want to delete the stack stack_name2? (yes/no): no
+Skipping deletion of stack: stack_name2
+```
+
 ## Arguments and Options
 
 - `<cutoff-date-time>`: The cutoff date-time in format `YYYY-MM-DDTHH:MM:SSZ (UTC)`. Stacks created after this date-time will be deleted.
