@@ -6,3 +6,4 @@
 ./s3/bucket-cleanup/instruction--s3-bucket-deletion-problem
 s3/bucket-cleanup/bucket-content-cleanup/try*
 s3/bucket-cleanup/bucket-content-cleanup/.testing
+**/.black-noter
