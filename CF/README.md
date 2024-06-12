@@ -7,7 +7,8 @@ This repository contains a script to delete AWS CloudFormation stacks created af
 ## Table of Contents
 
 - [Usage](#usage)
-- [Options](#options)
+- [Arguments and Options](#options)
+- [Logging](#logging)
 - [Example](#example)
 
 
@@ -34,7 +35,8 @@ Skipping deletion of stack: stack_name2
 - `<cutoff-date-time>`: The cutoff date-time in format `YYYY-MM-DDTHH:MM:SSZ (UTC)`. Stacks created after this date-time will be deleted.
 - `--exclude-stacks` or `-e`: List of stack names to exclude from deletion. This can be a comma-separated list or a path to a file containing stack names (one per line).
 - `--force` or `-f`: Force deletion without confirmation. By defualt, the script will prompt a user confirm each stack deletion manually. 
-
+- `--log-file` or `-l`: Specify the exact name and location of the log file. If this option is not provided, the script will generate a log file with a timestamped name in the directory specified by the `--log-dir` option.
+- `--log-dir` or `-d`: specify the directory where the log file should be stored. The default directory is `./.script-logs`.
 
 ## Example
 
@@ -50,3 +52,6 @@ Skipping deletion of stack: stack_name2
 
   `python delete-CF-stack-base-on-date-time.py 2024-06-10T00:00:00Z --exclude-stacks stack1,stack2 --force`
 
+- Specifying a Custom Log Directory
+
+  `python delete-CF-stack-base-on-date-time.py 2024-06-10T00:00:00Z --exclude-stacks stack1,stack2 --log-dir /custom-log-directory`
