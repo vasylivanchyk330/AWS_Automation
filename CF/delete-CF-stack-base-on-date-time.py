@@ -6,7 +6,22 @@ import argparse
 import os
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def setup_logger(log_file):
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # Create handlers
+    console_handler = logging.StreamHandler()
+    file_handler = logging.FileHandler(log_file)
+    
+    # Create formatters and add them to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+    
+    # Add handlers to the logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
 
 def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks):
     """List all CloudFormation stacks created after the specified cutoff date, excluding specific stacks."""
@@ -19,18 +34,35 @@ def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks):
                 stacks_to_delete.append(stack['StackName'])
     return stacks_to_delete
 
-def delete_stack(cf_client, stack_name, force):
-    """Delete the specified CloudFormation stack."""
+def delete_stack(cf_client, stack_name, force, retries=3):
+    """Delete the specified CloudFormation stack with retry logic for DELETE_FAILED status."""
     try:
-        if not force:
-            confirm = input(f"Are you sure you want to delete the stack {stack_name}? (yes/no): ")
-            if confirm.lower() != 'yes':
-                logging.info(f"Skipping deletion of stack: {stack_name}")
-                return
-        cf_client.delete_stack(StackName=stack_name)
-        logging.info(f"Initiated deletion of stack: {stack_name}")
-    except Exception as e:
+        for attempt in range(retries):
+            if not force:
+                confirm = input(f"Are you sure you want to delete the stack {stack_name}? (yes/no): ")
+                if confirm.lower() != 'yes':
+                    logging.info(f"Skipping deletion of stack: {stack_name}")
+                    return
+
+            cf_client.delete_stack(StackName=stack_name)
+            logging.info(f"Initiated deletion of stack: {stack_name}")
+            
+            # Wait for the stack to reach a terminal state
+            waiter = cf_client.get_waiter('stack_delete_complete')
+            waiter.wait(StackName=stack_name)
+
+            logging.info(f"Successfully deleted stack: {stack_name}")
+            return
+
+    except cf_client.exceptions.ClientError as e:
         logging.error(f"Error deleting stack {stack_name}: {e}")
+        if 'DELETE_FAILED' in str(e):
+            logging.error(f"Stack {stack_name} entered DELETE_FAILED state. Retrying... (Attempt {attempt+1}/{retries})")
+        else:
+            logging.error(f"Failed to delete stack {stack_name}: {e}")
+            return
+
+    logging.error(f"Failed to delete stack {stack_name} after {retries} attempts. Please investigate manually.")
 
 def read_exclude_stacks(file_path):
     """Read the list of stack names to exclude from a file."""
@@ -46,7 +78,9 @@ def main():
     parser.add_argument("cutoff_date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
     parser.add_argument("--exclude-stacks", "-e", help="List of stacks to exclude from deletion, can be a comma-separated list or a file containing stack names")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
-    
+    parser.add_argument("--log-file", "-l", help="Log file to store the output")
+    parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
+
     args = parser.parse_args()
 
     try:
@@ -55,6 +89,15 @@ def main():
     except ValueError:
         logging.error("Incorrect date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
         sys.exit(1)
+
+    # Define the default log file path
+    log_dir = args.log_dir
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    log_file = args.log_file or os.path.join(log_dir, f"script_run_{datetime.now().strftime('%Y_%m_%d___%H%M%S')}.log")
+
+    # Setup logger
+    setup_logger(log_file)
 
     # Handle exclude stacks
     exclude_stacks = []
@@ -69,8 +112,27 @@ def main():
     stacks_to_delete = list_stacks_created_after(cf_client, cutoff_date, exclude_stacks)
     logging.info(f"Found {len(stacks_to_delete)} stacks created after {args.cutoff_date}")
 
+    success = True  # Track the success of stack deletions
     for stack_name in stacks_to_delete:
-        delete_stack(cf_client, stack_name, args.force)
+        try:
+            delete_stack(cf_client, stack_name, args.force)
+        except Exception as e:
+            logging.error(f"Error during deletion of stack {stack_name}: {e}")
+            success = False
+
+    # Rename the log file if any stack failed to delete; assign exit_code value for later call
+    if not success:
+        error_log_file = log_file.replace('.log', '__errorred.log')
+        os.rename(log_file, error_log_file)
+        log_file = error_log_file
+        exit_code = 1
+    else:
+        exit_code = 0
+
+    # Print out the log file location at the end
+    print(f"THE LOG FILE LOCATION IS: {log_file}")
+    
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()
