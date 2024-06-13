@@ -23,14 +23,14 @@ def setup_logger(log_file):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, pattern=None):
-    """List all CloudFormation stacks created after the specified cutoff date, excluding specific stacks."""
+def list_stacks_created_between(cf_client, cutoff_date, until_date, exclude_stacks, pattern=None):
+    """List all CloudFormation stacks created between the specified cutoff date and until date, excluding specific stacks."""
     stacks_to_delete = []
     paginator = cf_client.get_paginator('describe_stacks')
     for page in paginator.paginate():
         for stack in page['Stacks']:
             creation_time = stack['CreationTime']
-            if creation_time > cutoff_date and stack['StackName'] not in exclude_stacks:
+            if cutoff_date < creation_time <= until_date and stack['StackName'] not in exclude_stacks:
                 if pattern and pattern.lower() not in stack['StackName'].lower():
                     continue
                 stacks_to_delete.append(stack['StackName'])
@@ -76,8 +76,10 @@ def read_exclude_stacks(file_path):
     return exclude_stacks
 
 def main():
-    parser = argparse.ArgumentParser(description="Delete CloudFormation stacks created after a specific date-time.")
+    parser = argparse.ArgumentParser(description="Delete CloudFormation stacks created between specific date-times.")
     parser.add_argument("cutoff_date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
+    parser.add_argument("until_date", nargs='?', default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC), default is now")
     parser.add_argument("--exclude-stacks", "-e", help="List of stacks to exclude from deletion, can be a comma-separated list or a file containing stack names")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output")
@@ -90,7 +92,14 @@ def main():
         cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ")
         cutoff_date = cutoff_date.replace(tzinfo=timezone.utc)
     except ValueError:
-        logging.error("Incorrect date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+        logging.error("Incorrect cutoff date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+        sys.exit(1)
+
+    try:
+        until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ")
+        until_date = until_date.replace(tzinfo=timezone.utc)
+    except ValueError:
+        logging.error("Incorrect until date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
         sys.exit(1)
 
     # Define the default log file path
@@ -112,10 +121,10 @@ def main():
 
     cf_client = boto3.client('cloudformation')
 
-    stacks_to_delete = list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, args.pattern)
+    stacks_to_delete = list_stacks_created_between(cf_client, cutoff_date, until_date, exclude_stacks, args.pattern)
     
     # Summary of stacks to delete
-    logging.info(f"Found {len(stacks_to_delete)} stacks created after {args.cutoff_date}")
+    logging.info(f"Found {len(stacks_to_delete)} stacks created between {args.cutoff_date} and {args.until_date}")
     if stacks_to_delete:
         logging.info("Stacks to be deleted:")
         for stack_name in stacks_to_delete:
