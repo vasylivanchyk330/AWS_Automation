@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import sys
 import argparse
 import os
+import fnmatch
 
 # Configure logging
 def setup_logger(log_file):
@@ -23,7 +24,7 @@ def setup_logger(log_file):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks):
+def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, pattern=None):
     """List all CloudFormation stacks created after the specified cutoff date, excluding specific stacks."""
     stacks_to_delete = []
     paginator = cf_client.get_paginator('describe_stacks')
@@ -31,6 +32,8 @@ def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks):
         for stack in page['Stacks']:
             creation_time = stack['CreationTime']
             if creation_time > cutoff_date and stack['StackName'] not in exclude_stacks:
+                if pattern and not fnmatch.fnmatch(stack['StackName'], pattern):
+                    continue
                 stacks_to_delete.append(stack['StackName'])
     return stacks_to_delete
 
@@ -80,6 +83,7 @@ def main():
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
+    parser.add_argument("--pattern", "-p", help="Pattern to filter stacks for deletion")
 
     args = parser.parse_args()
 
@@ -109,7 +113,7 @@ def main():
 
     cf_client = boto3.client('cloudformation')
 
-    stacks_to_delete = list_stacks_created_after(cf_client, cutoff_date, exclude_stacks)
+    stacks_to_delete = list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, args.pattern)
     logging.info(f"Found {len(stacks_to_delete)} stacks created after {args.cutoff_date}")
 
     success = True  # Track the success of stack deletions
