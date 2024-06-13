@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import sys
 import argparse
 import os
-import fnmatch
 
 # Configure logging
 def setup_logger(log_file):
@@ -32,7 +31,7 @@ def list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, pattern=No
         for stack in page['Stacks']:
             creation_time = stack['CreationTime']
             if creation_time > cutoff_date and stack['StackName'] not in exclude_stacks:
-                if pattern and not fnmatch.fnmatch(stack['StackName'], pattern):
+                if pattern and pattern.lower() not in stack['StackName'].lower():
                     continue
                 stacks_to_delete.append(stack['StackName'])
     return stacks_to_delete
