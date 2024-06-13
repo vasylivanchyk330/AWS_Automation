@@ -3,4 +3,3 @@ s3/bucket-cleanup/bucket-content-cleanup/try*
 s3/bucket-cleanup/bucket-content-cleanup/.testing
 .*
 ./CF/.black-noter
-.black-noter.sh
