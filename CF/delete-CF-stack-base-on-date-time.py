@@ -113,7 +113,13 @@ def main():
     cf_client = boto3.client('cloudformation')
 
     stacks_to_delete = list_stacks_created_after(cf_client, cutoff_date, exclude_stacks, args.pattern)
+    
+    # Summary of stacks to delete
     logging.info(f"Found {len(stacks_to_delete)} stacks created after {args.cutoff_date}")
+    if stacks_to_delete:
+        logging.info("Stacks to be deleted:")
+        for stack_name in stacks_to_delete:
+            logging.info(f" - {stack_name}")
 
     success = True  # Track the success of stack deletions
     for stack_name in stacks_to_delete:
