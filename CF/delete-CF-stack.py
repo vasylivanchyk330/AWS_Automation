@@ -133,14 +133,23 @@ def main():
         # Prompt to delete all stacks
         confirm_all = input("Do you want to delete them all? (yes/no): ")
         logging.info(f"User prompt response: {confirm_all}")
-        if confirm_all.lower() != 'yes':
-            logging.info("Aborting deletion of all stacks.")
-            sys.exit(0)
+        if confirm_all.lower() == 'yes':
+            delete_all = True
+        else:
+            delete_all = False
 
     success = True  # Track the success of stack deletions
     for stack_name in stacks_to_delete:
         try:
-            delete_stack(cf_client, stack_name, args.force)
+            if delete_all:
+                delete_stack(cf_client, stack_name, args.force)
+            else:
+                confirm_each = input(f"Do you want to delete the stack {stack_name}? (yes/no): ")
+                logging.info(f"User prompt response for {stack_name}: {confirm_each}")
+                if confirm_each.lower() == 'yes':
+                    delete_stack(cf_client, stack_name, args.force)
+                else:
+                    logging.info(f"Skipping deletion of stack: {stack_name}")
         except Exception as e:
             logging.error(f"Error during deletion of stack {stack_name}: {e}")
             success = False
