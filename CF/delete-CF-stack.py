@@ -129,6 +129,13 @@ def main():
         logging.info("Stacks to be deleted:")
         for stack_name in stacks_to_delete:
             logging.info(f" - {stack_name}")
+        
+        # Prompt to delete all stacks
+        confirm_all = input("Do you want to delete them all? (yes/no): ")
+        logging.info(f"User prompt response: {confirm_all}")
+        if confirm_all.lower() != 'yes':
+            logging.info("Aborting deletion of all stacks.")
+            sys.exit(0)
 
     success = True  # Track the success of stack deletions
     for stack_name in stacks_to_delete:
