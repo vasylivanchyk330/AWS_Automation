@@ -36,16 +36,10 @@ def list_stacks_created_between(cf_client, cutoff_date, until_date, exclude_stac
                 stacks_to_delete.append(stack['StackName'])
     return stacks_to_delete
 
-def delete_stack(cf_client, stack_name, force, retries=3):
+def delete_stack(cf_client, stack_name, retries=3):
     """Delete the specified CloudFormation stack with retry logic for DELETE_FAILED status."""
     try:
         for attempt in range(retries):
-            if not force:
-                confirm = input(f"Are you sure you want to delete the stack {stack_name}? (yes/no): ")
-                if confirm.lower() != 'yes':
-                    logging.info(f"Skipping deletion of stack: {stack_name}")
-                    return
-
             cf_client.delete_stack(StackName=stack_name)
             logging.info(f"Initiated deletion of stack: {stack_name}")
             
