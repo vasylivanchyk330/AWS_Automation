@@ -46,7 +46,11 @@ def enable_termination_protection(cf_client, stack_name):
         )
         logging.info(f"Enabled termination protection for stack: {stack_name}")
     except cf_client.exceptions.ClientError as e:
-        logging.error(f"Error enabling termination protection for stack {stack_name}: {e}")
+        error_message = str(e)
+        if "being a substack" in error_message:
+            logging.error(f"Cannot enable termination protection for stack {stack_name}: it is a substack.")
+        else:
+            logging.error(f"Error enabling termination protection for stack {stack_name}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Enable termination protection for CloudFormation stacks.")
