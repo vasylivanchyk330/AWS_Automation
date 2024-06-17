@@ -29,7 +29,8 @@ def get_stacks(cf_client, pattern=None):
     for page in paginator.paginate():
         for stack in page['Stacks']:
             if pattern:
-                if re.search(pattern, stack['StackName']):
+                # Use re.search with re.IGNORECASE to match the pattern with the stack name in a case-insensitive manner
+                if re.search(pattern, stack['StackName'], re.IGNORECASE):
                     stacks.append(stack['StackName'])
             else:
                 stacks.append(stack['StackName'])
@@ -70,12 +71,16 @@ def main():
 
     # Prompt the user to confirm
     confirm = input("Do you want to enable termination protection for all the listed stacks? (yes/no): ")
-    if confirm.lower() != 'yes':
-        logging.info("Operation aborted by the user.")
-        return
-
-    for stack_name in stacks:
-        enable_termination_protection(cf_client, stack_name)
+    if confirm.lower() == 'yes':
+        for stack_name in stacks:
+            enable_termination_protection(cf_client, stack_name)
+    else:
+        for stack_name in stacks:
+            confirm_each = input(f"Do you want to enable termination protection for stack {stack_name}? (yes/no): ")
+            if confirm_each.lower() == 'yes':
+                enable_termination_protection(cf_client, stack_name)
+            else:
+                logging.info(f"Skipping termination protection for stack: {stack_name}")
 
     logging.info("Completed enabling termination protection for the specified stacks.")
 
