@@ -1,6 +1,7 @@
 import boto3
 import json
 import argparse
+from botocore.exceptions import ClientError
 
 def get_bucket_policy(s3_client, bucket_name):
     """Get the current bucket policy."""
@@ -8,8 +9,11 @@ def get_bucket_policy(s3_client, bucket_name):
         response = s3_client.get_bucket_policy(Bucket=bucket_name)
         policy = json.loads(response['Policy'])
         return policy
-    except s3_client.exceptions.NoSuchBucketPolicy:
-        return {"Version": "2012-10-17", "Statement": []}
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+            return {"Version": "2012-10-17", "Statement": []}
+        else:
+            raise
 
 def update_bucket_policy(s3_client, bucket_name):
     """Update the bucket policy to add the deny delete policy statement."""
