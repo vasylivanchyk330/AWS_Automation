@@ -1,7 +1,5 @@
 import boto3
 import logging
-from datetime import datetime, timezone
-import sys
 import argparse
 import os
 import re
@@ -24,20 +22,18 @@ def setup_logger(log_file):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-def list_eventbridge_rules(events_client, cutoff_date, until_date, pattern=None):
-    """List all EventBridge rules created between the specified dates, optionally filtering by a pattern."""
+def list_eventbridge_rules(events_client, pattern=None):
+    """List all EventBridge rules, optionally filtering by a pattern."""
     rules_to_delete = []
     paginator = events_client.get_paginator('list_rules')
     for page in paginator.paginate():
         for rule in page['Rules']:
-            rule_details = events_client.describe_rule(Name=rule['Name'])
-            creation_time = rule_details['CreatedAt']
-            if cutoff_date <= creation_time <= until_date:
-                if pattern:
-                    if re.search(pattern, rule['Name'], re.IGNORECASE):
-                        rules_to_delete.append(rule['Name'])
-                else:
+            if pattern:
+                # Use re.search with re.IGNORECASE to match the pattern with the rule name in a case-insensitive manner
+                if re.search(pattern, rule['Name'], re.IGNORECASE):
                     rules_to_delete.append(rule['Name'])
+            else:
+                rules_to_delete.append(rule['Name'])
     return rules_to_delete
 
 def delete_eventbridge_rule(events_client, rule_name, retries=3):
@@ -77,30 +73,12 @@ def read_exclude_rules(file_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Delete EventBridge rules matching a specific pattern.")
-    parser.add_argument("cutoff_date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
-    parser.add_argument("until_date", nargs='?', default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                        help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC), default is now")
+    parser.add_argument("--pattern", "-p", help="Pattern to filter rule names for deletion.")
     parser.add_argument("--exclude-rules", "-e", help="List of rules to exclude from deletion, can be a comma-separated list or a file containing rule names")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output", default="eventbridge_cleanup.log")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
-    parser.add_argument("--pattern", "-p", help="Pattern to filter rule names for deletion")
-
     args = parser.parse_args()
-
-    try:
-        cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ")
-        cutoff_date = cutoff_date.replace(tzinfo=timezone.utc)
-    except ValueError:
-        logging.error("Incorrect cutoff date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
-        sys.exit(1)
-
-    try:
-        until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ")
-        until_date = until_date.replace(tzinfo=timezone.utc)
-    except ValueError:
-        logging.error("Incorrect until date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
-        sys.exit(1)
 
     # Define the default log file path
     log_dir = args.log_dir
@@ -121,13 +99,13 @@ def main():
 
     events_client = boto3.client('events')
 
-    rules_to_delete = list_eventbridge_rules(events_client, cutoff_date, until_date, args.pattern)
+    rules_to_delete = list_eventbridge_rules(events_client, args.pattern)
     
     # Filter out the excluded rules
     rules_to_delete = [rule for rule in rules_to_delete if rule not in exclude_rules]
     
     # Summary of rules to delete
-    logging.info(f"Found {len(rules_to_delete)} rules matching the pattern and date criteria:")
+    logging.info(f"Found {len(rules_to_delete)} rules matching the pattern:")
     if rules_to_delete:
         logging.info("Rules to be deleted:")
         for rule_name in rules_to_delete:
@@ -145,7 +123,6 @@ def main():
             delete_all = True
 
     success = True  # Track the success of rule deletions
-    
     for rule_name in rules_to_delete:
         try:
             if delete_all:
