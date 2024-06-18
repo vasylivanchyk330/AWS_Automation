@@ -1,5 +1,7 @@
 import boto3
 import logging
+from datetime import datetime, timezone
+import sys
 import argparse
 import os
 import re
@@ -72,13 +74,19 @@ def read_exclude_rules(file_path):
     return exclude_rules
 
 def main():
-    parser = argparse.ArgumentParser(description="Delete EventBridge rules matching a specific pattern.")
+    parser = argparse.ArgumentParser(description="Delete EventBridge rules matching a specific pattern or provided names.")
+    parser.add_argument("rules", nargs='*', help="Names of rules to delete.")
     parser.add_argument("--pattern", "-p", help="Pattern to filter rule names for deletion.")
     parser.add_argument("--exclude-rules", "-e", help="List of rules to exclude from deletion, can be a comma-separated list or a file containing rule names")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output", default="eventbridge_cleanup.log")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     args = parser.parse_args()
+
+    if not args.rules and not args.pattern:
+        logging.error("You must provide at least one rule name or a pattern.")
+        parser.print_help()
+        sys.exit(1)
 
     # Define the default log file path
     log_dir = args.log_dir
@@ -99,13 +107,17 @@ def main():
 
     events_client = boto3.client('events')
 
-    rules_to_delete = list_eventbridge_rules(events_client, args.pattern)
+    rules_to_delete = args.rules if args.rules else []
+
+    if args.pattern:
+        pattern_matched_rules = list_eventbridge_rules(events_client, args.pattern)
+        rules_to_delete.extend(pattern_matched_rules)
     
-    # Filter out the excluded rules
-    rules_to_delete = [rule for rule in rules_to_delete if rule not in exclude_rules]
+    # Remove duplicates and filter out the excluded rules
+    rules_to_delete = list(set(rules_to_delete) - set(exclude_rules))
     
     # Summary of rules to delete
-    logging.info(f"Found {len(rules_to_delete)} rules matching the pattern:")
+    logging.info(f"Found {len(rules_to_delete)} rules matching the criteria:")
     if rules_to_delete:
         logging.info("Rules to be deleted:")
         for rule_name in rules_to_delete:
