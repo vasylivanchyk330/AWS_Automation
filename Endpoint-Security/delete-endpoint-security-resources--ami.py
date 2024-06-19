@@ -31,15 +31,16 @@ def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
     response = ec2_client.describe_images(Owners=['self'])
     
     for image in response['Images']:
-        creation_date = image['CreationDate']
-        if cutoff_date <= creation_date <= until_date:
-            ami_name = image.get('Name', '')
-            logging.debug(f"Checking AMI: {ami_name}")
-            if pattern is None or re.search(pattern, image.get('Name', ''), re.IGNORECASE):
+        creation_date_str = image['CreationDate']
+        creation_date = datetime.strptime(creation_date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+        ami_name = image.get('Name', '')
+        logging.debug(f"Checking AMI: {ami_name} with Creation Date: {creation_date}")
+        if (not cutoff_date or cutoff_date <= creation_date) and (not until_date or creation_date <= until_date):
+            if pattern is None or re.search(pattern, ami_name, re.IGNORECASE):
                 amis_to_delete.append({
                     'ImageId': image['ImageId'],
-                    'Name': image.get('Name', 'N/A'),
-                    'CreationDate': creation_date
+                    'Name': ami_name,
+                    'CreationDate': creation_date_str
                 })
     
     return amis_to_delete
@@ -99,9 +100,9 @@ def main():
     amis_to_delete = []
 
     # List AMIs based on date range and pattern
-    if cutoff_date:
+    if cutoff_date or args.pattern:
         logging.info(f"Listing AMIs owned by the account between {cutoff_date} and {until_date} with pattern {args.pattern}...")
-        amis_to_delete.extend(list_amis(ec2_client, cutoff_date.strftime("%Y-%m-%dT%H:%M:%SZ"), until_date.strftime("%Y-%m-%dT%H:%M:%SZ"), pattern=args.pattern))
+        amis_to_delete.extend(list_amis(ec2_client, cutoff_date, until_date, pattern=args.pattern))
     
     # List AMIs based on specific names
     if args.ami_names:
@@ -117,7 +118,7 @@ def main():
                 })
 
     # Remove duplicates
-    amis_to_delete = {ami['ImageId']: ami for ami in amis_to_delete}.values()
+    amis_to_delete = list({ami['ImageId']: ami for ami in amis_to_delete}.values())
 
     # Summary of AMIs to delete
     logging.info(f"Found {len(amis_to_delete)} AMIs matching the criteria:")
