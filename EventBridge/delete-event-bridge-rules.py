@@ -27,22 +27,24 @@ def setup_logger(log_file):
 def list_eventbridge_rules(events_client, pattern=None):
     """List all EventBridge rules, optionally filtering by a pattern."""
     rules_to_delete = []
+    # if no pattern provided, return an empty list of rules_to_delete
+    if not pattern:
+        return rules_to_delete
+
     paginator = events_client.get_paginator('list_rules')
     for page in paginator.paginate():
         for rule in page['Rules']:
-            if pattern:
-                # Use re.search with re.IGNORECASE to match the pattern with the rule name in a case-insensitive manner
-                if re.search(pattern, rule['Name'], re.IGNORECASE):
-                    rules_to_delete.append(rule['Name'])
-            else:
+            if re.search(pattern, rule['Name'], re.IGNORECASE):
                 rules_to_delete.append(rule['Name'])
     return rules_to_delete
+
 
 def delete_eventbridge_rule(events_client, rule_name, retries=3):
     """Delete the specified EventBridge rule with retry logic."""
     for attempt in range(retries):
         try:
-            # First, remove all targets associated with the rule
+            # First, remove all targets associated with the rule.
+            # Targets themselves are not deleted. They are simply detached from EventBridge rules.
             targets = events_client.list_targets_by_rule(Rule=rule_name)['Targets']
             if targets:
                 target_ids = [target['Id'] for target in targets]
@@ -109,6 +111,7 @@ def main():
 
     rules_to_delete = args.rules if args.rules else []
 
+    # add the pattern_matched_rules to rules provided provided as arguments 
     if args.pattern:
         pattern_matched_rules = list_eventbridge_rules(events_client, args.pattern)
         rules_to_delete.extend(pattern_matched_rules)
