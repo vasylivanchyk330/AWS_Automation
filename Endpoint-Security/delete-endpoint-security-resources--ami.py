@@ -33,6 +33,7 @@ def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
     for image in response['Images']:
         creation_date = image['CreationDate']
         if cutoff_date <= creation_date <= until_date:
+            logging.debug(f"Checking AMI: {ami_name}")
             if pattern is None or re.search(pattern, image.get('Name', ''), re.IGNORECASE):
                 amis_to_delete.append({
                     'ImageId': image['ImageId'],
