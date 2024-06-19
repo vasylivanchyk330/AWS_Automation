@@ -59,24 +59,31 @@ def delete_ami(ec2_client, image_id):
 
 def main():
     parser = argparse.ArgumentParser(description="Delete AMIs owned by your account within a specified date range.")
-    parser.add_argument("cutoff_date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
-    parser.add_argument("until_date", nargs='?', default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
+    parser.add_argument("--until-date", default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                         help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC), default is now")
     parser.add_argument("--pattern", "-p", help="Pattern to filter AMI names for deletion.")
+    parser.add_argument("ami_names", nargs='*', help="List of specific AMI names to delete.")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output", default="ami_cleanup.log")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     args = parser.parse_args()
 
-    # Validate date formats
+    # Check that at least one criterion is provided
+    if not args.cutoff_date and not args.pattern and not args.ami_names:
+        logging.error("You must provide at least one of --cutoff-date, --pattern, or ami_names.")
+        parser.print_help()
+        sys.exit(1)
+
+    # Validate date formats if provided
     try:
-        cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) if args.cutoff_date else None
         until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
     except ValueError as e:
         logging.error(f"Invalid date format: {e}")
         sys.exit(1)
 
-    # Define the default log file pathd
+    # Define the default log file path
     log_dir = args.log_dir
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -87,9 +94,29 @@ def main():
 
     ec2_client = boto3.client('ec2')
 
-    logging.info(f"Listing AMIs owned by the account between {cutoff_date} and {until_date}...")
-    amis_to_delete = list_amis(ec2_client, cutoff_date.strftime("%Y-%m-%dT%H:%M:%SZ"), until_date.strftime("%Y-%m-%dT%H:%M:%SZ"), pattern=args.pattern)
+    amis_to_delete = []
+
+    # List AMIs based on date range and pattern
+    if cutoff_date:
+        logging.info(f"Listing AMIs owned by the account between {cutoff_date} and {until_date} with pattern {args.pattern}...")
+        amis_to_delete.extend(list_amis(ec2_client, cutoff_date.strftime("%Y-%m-%dT%H:%M:%SZ"), until_date.strftime("%Y-%m-%dT%H:%M:%SZ"), pattern=args.pattern))
     
+    # List AMIs based on specific names
+    if args.ami_names:
+        ami_names = args.ami_names
+        logging.info(f"Listing AMIs with specific names: {ami_names}")
+        response = ec2_client.describe_images(Owners=['self'])
+        for image in response['Images']:
+            if image.get('Name') in ami_names:
+                amis_to_delete.append({
+                    'ImageId': image['ImageId'],
+                    'Name': image.get('Name', 'N/A'),
+                    'CreationDate': image['CreationDate']
+                })
+
+    # Remove duplicates
+    amis_to_delete = {ami['ImageId']: ami for ami in amis_to_delete}.values()
+
     # Summary of AMIs to delete
     logging.info(f"Found {len(amis_to_delete)} AMIs matching the criteria:")
     if amis_to_delete:
