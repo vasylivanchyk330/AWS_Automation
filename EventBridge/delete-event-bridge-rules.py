@@ -85,6 +85,7 @@ def main():
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     args = parser.parse_args()
 
+    # make either rules or pattern obligatory
     if not args.rules and not args.pattern:
         logging.error("You must provide at least one rule name or a pattern.")
         parser.print_help()
