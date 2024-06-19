@@ -65,7 +65,7 @@ def main():
     parser.add_argument("--pattern", "-p", help="Pattern to filter AMI names for deletion.")
     parser.add_argument("ami_names", nargs='*', help="List of specific AMI names to delete.")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
-    parser.add_argument("--log-file", "-l", help="Log file to store the output", default="ami_cleanup.log")
+    parser.add_argument("--log-file", "-l", help="Log file to store the output")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     args = parser.parse_args()
 
