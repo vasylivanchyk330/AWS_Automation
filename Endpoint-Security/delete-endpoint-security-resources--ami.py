@@ -76,7 +76,7 @@ def main():
         logging.error(f"Invalid date format: {e}")
         sys.exit(1)
 
-    # Define the default log file path
+    # Define the default log file pathd
     log_dir = args.log_dir
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
