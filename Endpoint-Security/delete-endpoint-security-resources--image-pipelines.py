@@ -28,20 +28,20 @@ def list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=N
     """List all image pipelines optionally filtering by a pattern and creation date range."""
     pipelines_to_delete = []
     
-    paginator = imagebuilder_client.get_paginator('list_image_pipelines')
-    for page in paginator.paginate():
-        for pipeline in page['imagePipelineList']:
-            pipeline_name = pipeline.get('name', '')
-            creation_time_str = pipeline['dateCreated']
-            creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
-            logging.debug(f"Checking Image Pipeline: {pipeline_name} with Creation Time: {creation_time}")
-            if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
-                if pattern is None or re.search(pattern, pipeline_name, re.IGNORECASE):
-                    pipelines_to_delete.append({
-                        'Arn': pipeline['arn'],
-                        'Name': pipeline_name,
-                        'CreationTime': creation_time_str
-                    })
+    response = imagebuilder_client.list_image_pipelines()
+    
+    for pipeline in response['imagePipelineList']:
+        pipeline_name = pipeline.get('name', '')
+        creation_time_str = pipeline['dateCreated']
+        creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+        logging.debug(f"Checking Image Pipeline: {pipeline_name} with Creation Time: {creation_time}")
+        if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
+            if pattern is None or re.search(pattern, pipeline_name, re.IGNORECASE):
+                pipelines_to_delete.append({
+                    'Arn': pipeline['arn'],
+                    'Name': pipeline_name,
+                    'CreationTime': creation_time_str
+                })
     
     return pipelines_to_delete
 
@@ -101,15 +101,14 @@ def main():
     if args.pipeline_names:
         pipeline_names = args.pipeline_names
         logging.info(f"Listing image pipelines with specific names: {pipeline_names}")
-        paginator = imagebuilder_client.get_paginator('list_image_pipelines')
-        for page in paginator.paginate():
-            for pipeline in page['imagePipelineList']:
-                if pipeline.get('name') in pipeline_names:
-                    pipelines_to_delete.append({
-                        'Arn': pipeline['arn'],
-                        'Name': pipeline.get('name', 'N/A'),
-                        'CreationTime': pipeline['dateCreated']
-                    })
+        response = imagebuilder_client.list_image_pipelines()
+        for pipeline in response['imagePipelineList']:
+            if pipeline.get('name') in pipeline_names:
+                pipelines_to_delete.append({
+                    'Arn': pipeline['arn'],
+                    'Name': pipeline.get('name', 'N/A'),
+                    'CreationTime': pipeline['dateCreated']
+                })
 
     # Remove duplicates
     pipelines_to_delete = list({pipeline['Arn']: pipeline for pipeline in pipelines_to_delete}.values())
