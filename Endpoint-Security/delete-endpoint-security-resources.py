@@ -33,7 +33,6 @@ def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
         creation_date = datetime.strptime(creation_date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         ami_name = image.get('Name', '')
         logging.debug(f"Checking AMI: {ami_name} with Creation Date: {creation_date}")
-        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_date) and (not until_date or creation_date <= until_date):
             if pattern is None or re.search(pattern, ami_name, re.IGNORECASE):
                 amis_to_delete.append({
@@ -50,8 +49,11 @@ def delete_ami(ec2_client, image_id):
         logging.info(f"Deregistered AMI: {image_id}")
         snapshots = ec2_client.describe_snapshots(Filters=[{'Name': 'description', 'Values': [f'*{image_id}*']}])
         for snapshot in snapshots['Snapshots']:
-            ec2_client.delete_snapshot(SnapshotId=snapshot['SnapshotId'])
-            logging.info(f"Deleted snapshot: {snapshot['SnapshotId']} for AMI: {image_id}")
+            try:
+                ec2_client.delete_snapshot(SnapshotId=snapshot['SnapshotId'])
+                logging.info(f"Deleted snapshot: {snapshot['SnapshotId']} for AMI: {image_id}")
+            except ec2_client.exceptions.ClientError as e:
+                logging.error(f"Error deleting snapshot {snapshot['SnapshotId']} for AMI {image_id}: {e}")
     except ec2_client.exceptions.ClientError as e:
         logging.error(f"Error deleting AMI {image_id}: {e}")
 
@@ -64,7 +66,6 @@ def list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=N
         creation_time_str = pipeline['dateCreated']
         creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         logging.debug(f"Checking Image Pipeline: {pipeline_name} with Creation Time: {creation_time}")
-        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
             if pattern is None or re.search(pattern, pipeline_name, re.IGNORECASE):
                 pipelines_to_delete.append({
@@ -87,27 +88,38 @@ def list_images(imagebuilder_client, cutoff_date, until_date, pattern=None):
     images_to_delete = []
     response = imagebuilder_client.list_images()
     for image in response['imageVersionList']:
+        image_arn = image['arn']
         image_name = image.get('name', '')
-        creation_time_str = image['dateCreated']
-        creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
-        logging.debug(f"Checking Image: {image_name} with Creation Time: {creation_time}")
-        # Check date range and pattern
-        if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
-            if pattern is None or re.search(pattern, image_name, re.IGNORECASE):
-                images_to_delete.append({
-                    'Arn': image['arn'],
-                    'Name': image_name,
-                    'CreationTime': creation_time_str
-                })
+        logging.debug(f"Processing Image: {image_name} ({image_arn})")
+        try:
+            build_versions = imagebuilder_client.list_image_build_versions(imageVersionArn=image_arn)
+            logging.debug(f"Response for image build versions: {build_versions}")
+            if 'imageSummaryList' in build_versions:
+                for build_version in build_versions['imageSummaryList']:
+                    creation_time_str = build_version['dateCreated']
+                    creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+                    logging.debug(f"Checking Image Build Version: {build_version['arn']} with Creation Time: {creation_time}")
+                    if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
+                        if pattern is None or re.search(pattern, image_name, re.IGNORECASE):
+                            images_to_delete.append({
+                                'Arn': build_version['arn'],
+                                'Name': image_name,
+                                'CreationTime': creation_time_str
+                            })
+            else:
+                logging.warning(f"No imageSummaryList found for image ARN: {image_arn}")
+        except imagebuilder_client.exceptions.ClientError as e:
+            logging.error(f"Error listing build versions for image {image_arn}: {e}")
     return images_to_delete
 
 # Function to delete Images
 def delete_image(imagebuilder_client, image_arn):
     try:
+        logging.info(f"Deleting Image Version: {image_arn}")
         imagebuilder_client.delete_image(imageBuildVersionArn=image_arn)
-        logging.info(f"Deleted Image: {image_arn}")
-    except imagebuilder_client.exceptions.ClientError as e:
-        logging.error(f"Error deleting Image {image_arn}: {e}")
+        logging.info(f"Successfully deleted Image Version: {image_arn}")
+    except Exception as e:
+        logging.error(f"Error deleting Image Version {image_arn}: {e}")
 
 # Function to list Snapshots based on provided criteria
 def list_snapshots(ec2_client, cutoff_date, until_date, pattern=None):
@@ -121,7 +133,6 @@ def list_snapshots(ec2_client, cutoff_date, until_date, pattern=None):
         creation_time_str = snapshot['StartTime'].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         creation_time = snapshot['StartTime']
         logging.debug(f"Checking Snapshot: {snapshot_name} with Creation Time: {creation_time}")
-        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
             if pattern is None or re.search(pattern, snapshot_name, re.IGNORECASE):
                 snapshots_to_delete.append({
@@ -137,7 +148,10 @@ def delete_snapshot(ec2_client, snapshot_id):
         ec2_client.delete_snapshot(SnapshotId=snapshot_id)
         logging.info(f"Deleted Snapshot: {snapshot_id}")
     except ec2_client.exceptions.ClientError as e:
-        logging.error(f"Error deleting Snapshot {snapshot_id}: {e}")
+        if e.response['Error']['Code'] == 'InvalidSnapshot.NotFound':
+            logging.warning(f"Snapshot {snapshot_id} not found. It may have already been deleted.")
+        else:
+            logging.error(f"Error deleting Snapshot {snapshot_id}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Delete AWS resources matching specific criteria.")
@@ -178,6 +192,7 @@ def main():
 
     # List resources based on date range and pattern if provided
     if cutoff_date or args.pattern:
+
         logging.info(f"Listing resources created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
 
         if 'ami' in args.resource_types:
@@ -231,11 +246,18 @@ def main():
             response = imagebuilder_client.list_images()
             for image in response['imageVersionList']:
                 if image.get('name') in resource_names:
-                    resources_to_delete['image'].append({
-                        'Arn': image['arn'],
-                        'Name': image.get('name', 'N/A'),
-                        'CreationTime': image['dateCreated']
-                    })
+                    # List image build versions
+                    build_versions = imagebuilder_client.list_image_build_versions(imageVersionArn=image['arn'])
+                    logging.debug(f"Response for image build versions: {build_versions}")
+                    if 'imageSummaryList' in build_versions:
+                        for build_version in build_versions['imageSummaryList']:
+                            resources_to_delete['image'].append({
+                                'Arn': build_version['arn'],
+                                'Name': image.get('name', 'N/A'),
+                                'CreationTime': build_version['dateCreated']
+                            })
+                    else:
+                        logging.warning(f"No imageSummaryList found for image ARN: {image['arn']}")
 
         if 'snapshot' in args.resource_types:
             response = ec2_client.describe_snapshots(OwnerIds=['self'])
@@ -263,7 +285,7 @@ def main():
 
     # Summary of resources to delete
     for resource_type in args.resource_types:
-        logging.info(f"Found {len(resources_to_delete[resource_type])} {resource_type}(-s) matching the criteria:")
+        logging.info(f"Found {len(resources_to_delete[resource_type])} {resource_type}s matching the criteria:")
         if resources_to_delete[resource_type]:
             logging.info(f"{resource_type.capitalize()}s to be deleted:")
             for resource in resources_to_delete[resource_type]:
@@ -273,6 +295,12 @@ def main():
                     logging.info(f" - {resource['SnapshotId']} (Name: {resource['Name']}, CreationTime: {resource['CreationTime']})")
                 else:
                     logging.info(f" - {resource['Arn']} (Name: {resource['Name']}, CreationTime: {resource['CreationTime']})")
+
+    # Check if there are any resources to delete
+    total_resources_to_delete = sum(len(resources_to_delete[resource_type]) for resource_type in args.resource_types)
+    if total_resources_to_delete == 0:
+        logging.info("No resources found to delete.")
+        sys.exit(0)
     
     # Prompt to delete all resources
     if not args.force:
