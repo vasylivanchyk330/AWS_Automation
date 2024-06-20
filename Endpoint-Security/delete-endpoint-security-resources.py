@@ -263,7 +263,7 @@ def main():
 
     # Summary of resources to delete
     for resource_type in args.resource_types:
-        logging.info(f"Found {len(resources_to_delete[resource_type])} {resource_type}s matching the criteria:")
+        logging.info(f"Found {len(resources_to_delete[resource_type])} {resource_type}(-s) matching the criteria:")
         if resources_to_delete[resource_type]:
             logging.info(f"{resource_type.capitalize()}s to be deleted:")
             for resource in resources_to_delete[resource_type]:
