@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import sys
 import argparse
 import os
+import time
 
 # Configure logging
 def setup_logger(log_file):
@@ -54,11 +55,26 @@ def delete_stack(cf_client, stack_name, retries=3):
         logging.error(f"Error deleting stack {stack_name}: {e}")
         if 'DELETE_FAILED' in str(e):
             logging.error(f"Stack {stack_name} entered DELETE_FAILED state. Retrying... (Attempt {attempt+1}/{retries})")
+            # Investigate the cause of DELETE_FAILED
+            investigate_delete_failed(cf_client, stack_name)
         else:
             logging.error(f"Failed to delete stack {stack_name}: {e}")
             return
 
     logging.error(f"Failed to delete stack {stack_name} after {retries} attempts. Please investigate manually.")
+
+def investigate_delete_failed(cf_client, stack_name):
+    """Investigate the cause of DELETE_FAILED status."""
+    logging.info(f"Investigating DELETE_FAILED status for stack: {stack_name}")
+    events = cf_client.describe_stack_events(StackName=stack_name)['StackEvents']
+    failed_events = [event for event in events if event['ResourceStatus'] == 'DELETE_FAILED']
+    
+    for event in failed_events:
+        logging.error(f"Resource {event['LogicalResourceId']} failed to delete: {event['ResourceStatusReason']}")
+        # Additional logic can be added here to handle specific failures
+        if 'Custom Resource' in event['ResourceType']:
+            logging.error("Custom Resource failure detected. Check your Lambda function and ensure it is correctly responding to CloudFormation.")
+            # Implement any necessary fix or notification
 
 def read_exclude_stacks(file_path):
     """Read the list of stack names to exclude from a file."""
@@ -68,6 +84,24 @@ def read_exclude_stacks(file_path):
     with open(file_path, 'r') as file:
         exclude_stacks = [line.strip() for line in file if line.strip()]
     return exclude_stacks
+
+def delete_nested_stacks(cf_client, stack_name, retries=3):
+    """Delete nested CloudFormation stacks in the correct order."""
+    try:
+        response = cf_client.describe_stack_resources(StackName=stack_name)
+        nested_stacks = []
+        
+        for resource in response['StackResources']:
+            if resource['ResourceType'] == 'AWS::CloudFormation::Stack':
+                nested_stacks.append(resource['PhysicalResourceId'])
+        
+        for nested_stack in nested_stacks:
+            delete_nested_stacks(cf_client, nested_stack, retries)
+        
+        delete_stack(cf_client, stack_name, retries)
+    
+    except cf_client.exceptions.ClientError as e:
+        logging.error(f"Error retrieving stack {stack_name}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Delete CloudFormation stacks created between specific date-times.")
@@ -125,23 +159,26 @@ def main():
             logging.info(f" - {stack_name}")
         
         # Prompt to delete all stacks
-        confirm_all = input("Do you want to delete them all? (yes/no): ")
-        logging.info(f"User prompt response: {confirm_all}")
-        if confirm_all.lower() == 'yes':
-            delete_all = True
+        if not args.force:
+            confirm_all = input("Do you want to delete them all? (yes/no): ")
+            logging.info(f"User prompt response: {confirm_all}")
+            if confirm_all.lower() == 'yes':
+                delete_all = True
+            else:
+                delete_all = False
         else:
-            delete_all = False
+            delete_all = True
 
     success = True  # Track the success of stack deletions
     for stack_name in stacks_to_delete:
         try:
             if delete_all:
-                delete_stack(cf_client, stack_name, args.force)
+                delete_nested_stacks(cf_client, stack_name)
             else:
                 confirm_each = input(f"Do you want to delete the stack {stack_name}? (yes/no): ")
                 logging.info(f"User prompt response for {stack_name}: {confirm_each}")
                 if confirm_each.lower() == 'yes':
-                    delete_stack(cf_client, stack_name, args.force)
+                    delete_nested_stacks(cf_client, stack_name)
                 else:
                     logging.info(f"Skipping deletion of stack: {stack_name}")
         except Exception as e:
