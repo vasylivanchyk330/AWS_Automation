@@ -129,22 +129,16 @@ def delete_snapshot(ec2_client, snapshot_id):
 
 def main():
     parser = argparse.ArgumentParser(description="Delete AWS resources matching specific criteria.")
-    parser.add_argument("--resource-type", choices=['ami', 'pipeline', 'image', 'snapshot'], required=True, help="Type of resource to delete.")
+    parser.add_argument("--resource-types", nargs='+', choices=['ami', 'pipeline', 'image', 'snapshot'], required=True, help="Types of resources to delete.")
     parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
     parser.add_argument("--until-date", default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                         help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC), default is now")
     parser.add_argument("--pattern", "-p", help="Pattern to filter resource names for deletion.")
-    parser.add_argument("resource_names", nargs='*', help="List of specific resource names to delete.")
+    parser.add_argument("--resource-names", nargs='*', help="List of specific resource names to delete.")
     parser.add_argument("--force", "-f", action="store_true", help="Force deletion without confirmation")
     parser.add_argument("--log-file", "-l", help="Log file to store the output")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     args = parser.parse_args()
-
-    # Check that at least one criterion is provided
-    if not args.cutoff_date and not args.pattern and not args.resource_names:
-        logging.error("You must provide at least one of --cutoff-date, --pattern, or resource_names.")
-        parser.print_help()
-        sys.exit(1)
 
     # Validate date formats if provided
     try:
@@ -166,135 +160,132 @@ def main():
     ec2_client = boto3.client('ec2')
     imagebuilder_client = boto3.client('imagebuilder')
 
-    resources_to_delete = []
+    resources_to_delete = {resource_type: [] for resource_type in args.resource_types}
 
-    if args.resource_type == 'ami':
-        if cutoff_date or args.pattern:
-            logging.info(f"Listing AMIs created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
-            resources_to_delete.extend(list_amis(ec2_client, cutoff_date, until_date, pattern=args.pattern))
-        if args.resource_names:
-            ami_names = args.resource_names
-            logging.info(f"Listing AMIs with specific names: {ami_names}")
+    # List resources based on date range and pattern
+    if cutoff_date or args.pattern:
+        logging.info(f"Listing resources created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
+
+        if 'ami' in args.resource_types:
+            resources_to_delete['ami'].extend(list_amis(ec2_client, cutoff_date, until_date, pattern=args.pattern))
+        if 'pipeline' in args.resource_types:
+            resources_to_delete['pipeline'].extend(list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=args.pattern))
+        if 'image' in args.resource_types:
+            resources_to_delete['image'].extend(list_images(imagebuilder_client, cutoff_date, until_date, pattern=args.pattern))
+        if 'snapshot' in args.resource_types:
+            resources_to_delete['snapshot'].extend(list_snapshots(ec2_client, cutoff_date, until_date, pattern=args.pattern))
+
+    #```python
+    # List resources based on specific names
+    if args.resource_names:
+        resource_names = args.resource_names
+        logging.info(f"Listing resources with specific names: {resource_names}")
+
+        if 'ami' in args.resource_types:
             response = ec2_client.describe_images(Owners=['self'])
             for image in response['Images']:
-                if image.get('Name') in ami_names:
-                    resources_to_delete.append({
+                if image.get('Name') in resource_names:
+                    resources_to_delete['ami'].append({
                         'ImageId': image['ImageId'],
                         'Name': image.get('Name', 'N/A'),
                         'CreationDate': image['CreationDate']
                     })
 
-    elif args.resource_type == 'pipeline':
-        if cutoff_date or args.pattern:
-            logging.info(f"Listing image pipelines created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
-            resources_to_delete.extend(list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=args.pattern))
-        if args.resource_names:
-            pipeline_names = args.resource_names
-            logging.info(f"Listing image pipelines with specific names: {pipeline_names}")
+        if 'pipeline' in args.resource_types:
             response = imagebuilder_client.list_image_pipelines()
             for pipeline in response['imagePipelineList']:
-                if pipeline.get('name') in pipeline_names:
-                    resources_to_delete.append({
+                if pipeline.get('name') in resource_names:
+                    resources_to_delete['pipeline'].append({
                         'Arn': pipeline['arn'],
                         'Name': pipeline.get('name', 'N/A'),
                         'CreationTime': pipeline['dateCreated']
                     })
 
-    elif args.resource_type == 'image':
-        if cutoff_date or args.pattern:
-            logging.info(f"Listing images created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
-            resources_to_delete.extend(list_images(imagebuilder_client, cutoff_date, until_date, pattern=args.pattern))
-        if args.resource_names:
-            image_names = args.resource_names
-            logging.info(f"Listing images with specific names: {image_names}")
+        if 'image' in args.resource_types:
             response = imagebuilder_client.list_images()
             for image in response['imageVersionList']:
-                if image.get('name') in image_names:
-                    resources_to_delete.append({
+                if image.get('name') in resource_names:
+                    resources_to_delete['image'].append({
                         'Arn': image['arn'],
                         'Name': image.get('name', 'N/A'),
                         'CreationTime': image['dateCreated']
                     })
 
-    elif args.resource_type == 'snapshot':
-        if cutoff_date or args.pattern:
-            logging.info(f"Listing snapshots created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
-            resources_to_delete.extend(list_snapshots(ec2_client, cutoff_date, until_date, pattern=args.pattern))
-        if args.resource_names:
-            snapshot_names = args.resource_names
-            logging.info(f"Listing snapshots with specific names: {snapshot_names}")
+        if 'snapshot' in args.resource_types:
             response = ec2_client.describe_snapshots(OwnerIds=['self'])
             for snapshot in response['Snapshots']:
                 snapshot_name = ''
                 for tag in snapshot.get('Tags', []):
-                    if tag['Key'] == 'Name' and tag['Value'] in snapshot_names:
+                    if tag['Key'] == 'Name' and tag['Value'] in resource_names:
                         snapshot_name = tag['Value']
-                        resources_to_delete.append({
+                        resources_to_delete['snapshot'].append({
                             'SnapshotId': snapshot['SnapshotId'],
                             'Name': snapshot_name,
                             'CreationTime': snapshot['StartTime'].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
                         })
 
     # Remove duplicates
-    if args.resource_type == 'ami':
-        resources_to_delete = list({ami['ImageId']: ami for ami in resources_to_delete}.values())
-    elif args.resource_type == 'pipeline':
-        resources_to_delete = list({pipeline['Arn']: pipeline for pipeline in resources_to_delete}.values())
-    elif args.resource_type == 'image':
-        resources_to_delete = list({image['Arn']: image for image in resources_to_delete}.values())
-    elif args.resource_type == 'snapshot':
-        resources_to_delete = list({snapshot['SnapshotId']: snapshot for snapshot in resources_to_delete}.values())
+    for resource_type in args.resource_types:
+        if resource_type == 'ami':
+            resources_to_delete[resource_type] = list({ami['ImageId']: ami for ami in resources_to_delete[resource_type]}.values())
+        elif resource_type == 'pipeline':
+            resources_to_delete[resource_type] = list({pipeline['Arn']: pipeline for pipeline in resources_to_delete[resource_type]}.values())
+        elif resource_type == 'image':
+            resources_to_delete[resource_type] = list({image['Arn']: image for image in resources_to_delete[resource_type]}.values())
+        elif resource_type == 'snapshot':
+            resources_to_delete[resource_type] = list({snapshot['SnapshotId']: snapshot for snapshot in resources_to_delete[resource_type]}.values())
 
     # Summary of resources to delete
-    logging.info(f"Found {len(resources_to_delete)} {args.resource_type}s matching the criteria:")
-    if resources_to_delete:
-        logging.info(f"{args.resource_type.capitalize()}s to be deleted:")
-        for resource in resources_to_delete:
-            if args.resource_type in ['ami', 'snapshot']:
-                logging.info(f" - {resource['ImageId' if args.resource_type == 'ami' else 'SnapshotId']} (Name: {resource['Name']}, CreationDate: {resource['CreationTime']})")
-            else:
-                logging.info(f" - {resource['Arn']} (Name: {resource['Name']}, CreationDate: {resource['CreationTime']})")
-        
-        # Prompt to delete all resources
-        if not args.force:
-            confirm_all = input(f"Do you want to delete them all? (yes/no): ")
-            logging.info(f"User prompt response: {confirm_all}")
-            if confirm_all.lower() == 'yes':
-                delete_all = True
-            else:
-                delete_all = False
-        else:
-            delete_all = True
+    for resource_type in args.resource_types:
+        logging.info(f"Found {len(resources_to_delete[resource_type])} {resource_type}s matching the criteria:")
+        if resources_to_delete[resource_type]:
+            logging.info(f"{resource_type.capitalize()}s to be deleted:")
+            for resource in resources_to_delete[resource_type]:
+                if resource_type == 'ami':
+                    logging.info(f" - {resource['ImageId']} (Name: {resource['Name']}, CreationDate: {resource['CreationDate']})")
+                elif resource_type == 'snapshot':
+                    logging.info(f" - {resource['SnapshotId']} (Name: {resource['Name']}, CreationTime: {resource['CreationTime']})")
+                else:
+                    logging.info(f" - {resource['Arn']} (Name: {resource['Name']}, CreationTime: {resource['CreationTime']})")
+    
+    # Prompt to delete all resources
+    if not args.force:
+        confirm_all = input("Do you want to delete them all? (yes/no): ")
+        logging.info(f"User prompt response: {confirm_all}")
+        delete_all = confirm_all.lower() == 'yes'
+    else:
+        delete_all = True
 
     success = True  # Track the success of resource deletions
-    for resource in resources_to_delete:
-        try:
-            if delete_all:
-                if args.resource_type == 'ami':
-                    delete_ami(ec2_client, resource['ImageId'])
-                elif args.resource_type == 'pipeline':
-                    delete_image_pipeline(imagebuilder_client, resource['Arn'])
-                elif args.resource_type == 'image':
-                    delete_image(imagebuilder_client, resource['Arn'])
-                elif args.resource_type == 'snapshot':
-                    delete_snapshot(ec2_client, resource['SnapshotId'])
-            else:
-                confirm_each = input(f"Do you want to delete the {args.resource_type} {resource['ImageId' if args.resource_type == 'ami' else 'Arn' if args.resource_type in ['pipeline', 'image'] else 'SnapshotId']} (Name: {resource['Name']})? (yes/no): ")
-                logging.info(f"User prompt response for {resource['ImageId' if args.resource_type == 'ami' else 'Arn' if args.resource_type in ['pipeline', 'image'] else 'SnapshotId']}: {confirm_each}")
-                if confirm_each.lower() == 'yes':
-                    if args.resource_type == 'ami':
+    for resource_type in args.resource_types:
+        for resource in resources_to_delete[resource_type]:
+            try:
+                if delete_all:
+                    if resource_type == 'ami':
                         delete_ami(ec2_client, resource['ImageId'])
-                    elif args.resource_type == 'pipeline':
+                    elif resource_type == 'pipeline':
                         delete_image_pipeline(imagebuilder_client, resource['Arn'])
-                    elif args.resource_type == 'image':
+                    elif resource_type == 'image':
                         delete_image(imagebuilder_client, resource['Arn'])
-                    elif args.resource_type == 'snapshot':
+                    elif resource_type == 'snapshot':
                         delete_snapshot(ec2_client, resource['SnapshotId'])
                 else:
-                    logging.info(f"Skipping deletion of {args.resource_type}: {resource['ImageId' if args.resource_type == 'ami' else 'Arn' if args.resource_type in ['pipeline', 'image'] else 'SnapshotId']}")
-        except Exception as e:
-            logging.error(f"Error during deletion of {args.resource_type} {resource['ImageId' if args.resource_type == 'ami' else 'Arn' if args.resource_type in ['pipeline', 'image'] else 'SnapshotId']}: {e}")
-            success = False
+                    confirm_each = input(f"Do you want to delete the {resource_type} {resource['ImageId' if resource_type == 'ami' else 'Arn' if resource_type in ['pipeline', 'image'] else 'SnapshotId']} (Name: {resource['Name']})? (yes/no): ")
+                    logging.info(f"User prompt response for {resource['ImageId' if resource_type == 'ami' else 'Arn' if resource_type in ['pipeline', 'image'] else 'SnapshotId']}: {confirm_each}")
+                    if confirm_each.lower() == 'yes':
+                        if resource_type == 'ami':
+                            delete_ami(ec2_client, resource['ImageId'])
+                        elif resource_type == 'pipeline':
+                            delete_image_pipeline(imagebuilder_client, resource['Arn'])
+                        elif resource_type == 'image':
+                            delete_image(imagebuilder_client, resource['Arn'])
+                        elif resource_type == 'snapshot':
+                            delete_snapshot(ec2_client, resource['SnapshotId'])
+                    else:
+                        logging.info(f"Skipping deletion of {resource_type}: {resource['ImageId' if resource_type == 'ami' else 'Arn' if resource_type in ['pipeline', 'image'] else 'SnapshotId']}")
+            except Exception as e:
+                logging.error(f"Error during deletion of {resource_type} {resource['ImageId' if resource_type == 'ami' else 'Arn' if resource_type in ['pipeline', 'image'] else 'SnapshotId']}: {e}")
+                success = False
 
     # Rename the log file if any resource failed to delete; assign exit_code value for later call
     if not success:
