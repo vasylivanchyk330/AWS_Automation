@@ -24,6 +24,7 @@ def setup_logger(log_file):
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
+# Function to list AMIs based on provided criteria
 def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
     amis_to_delete = []
     response = ec2_client.describe_images(Owners=['self'])
@@ -32,6 +33,7 @@ def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
         creation_date = datetime.strptime(creation_date_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         ami_name = image.get('Name', '')
         logging.debug(f"Checking AMI: {ami_name} with Creation Date: {creation_date}")
+        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_date) and (not until_date or creation_date <= until_date):
             if pattern is None or re.search(pattern, ami_name, re.IGNORECASE):
                 amis_to_delete.append({
@@ -41,6 +43,7 @@ def list_amis(ec2_client, cutoff_date, until_date, pattern=None):
                 })
     return amis_to_delete
 
+# Function to delete AMIs
 def delete_ami(ec2_client, image_id):
     try:
         ec2_client.deregister_image(ImageId=image_id)
@@ -52,6 +55,7 @@ def delete_ami(ec2_client, image_id):
     except ec2_client.exceptions.ClientError as e:
         logging.error(f"Error deleting AMI {image_id}: {e}")
 
+# Function to list Image Pipelines based on provided criteria
 def list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=None):
     pipelines_to_delete = []
     response = imagebuilder_client.list_image_pipelines()
@@ -60,6 +64,7 @@ def list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=N
         creation_time_str = pipeline['dateCreated']
         creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         logging.debug(f"Checking Image Pipeline: {pipeline_name} with Creation Time: {creation_time}")
+        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
             if pattern is None or re.search(pattern, pipeline_name, re.IGNORECASE):
                 pipelines_to_delete.append({
@@ -69,6 +74,7 @@ def list_image_pipelines(imagebuilder_client, cutoff_date, until_date, pattern=N
                 })
     return pipelines_to_delete
 
+# Function to delete Image Pipelines
 def delete_image_pipeline(imagebuilder_client, pipeline_arn):
     try:
         imagebuilder_client.delete_image_pipeline(imagePipelineArn=pipeline_arn)
@@ -76,6 +82,7 @@ def delete_image_pipeline(imagebuilder_client, pipeline_arn):
     except imagebuilder_client.exceptions.ClientError as e:
         logging.error(f"Error deleting Image Pipeline {pipeline_arn}: {e}")
 
+# Function to list Images based on provided criteria
 def list_images(imagebuilder_client, cutoff_date, until_date, pattern=None):
     images_to_delete = []
     response = imagebuilder_client.list_images()
@@ -84,6 +91,7 @@ def list_images(imagebuilder_client, cutoff_date, until_date, pattern=None):
         creation_time_str = image['dateCreated']
         creation_time = datetime.strptime(creation_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
         logging.debug(f"Checking Image: {image_name} with Creation Time: {creation_time}")
+        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
             if pattern is None or re.search(pattern, image_name, re.IGNORECASE):
                 images_to_delete.append({
@@ -93,6 +101,7 @@ def list_images(imagebuilder_client, cutoff_date, until_date, pattern=None):
                 })
     return images_to_delete
 
+# Function to delete Images
 def delete_image(imagebuilder_client, image_arn):
     try:
         imagebuilder_client.delete_image(imageBuildVersionArn=image_arn)
@@ -100,6 +109,7 @@ def delete_image(imagebuilder_client, image_arn):
     except imagebuilder_client.exceptions.ClientError as e:
         logging.error(f"Error deleting Image {image_arn}: {e}")
 
+# Function to list Snapshots based on provided criteria
 def list_snapshots(ec2_client, cutoff_date, until_date, pattern=None):
     snapshots_to_delete = []
     response = ec2_client.describe_snapshots(OwnerIds=['self'])
@@ -111,6 +121,7 @@ def list_snapshots(ec2_client, cutoff_date, until_date, pattern=None):
         creation_time_str = snapshot['StartTime'].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         creation_time = snapshot['StartTime']
         logging.debug(f"Checking Snapshot: {snapshot_name} with Creation Time: {creation_time}")
+        # Check date range and pattern
         if (not cutoff_date or cutoff_date <= creation_time) and (not until_date or creation_time <= until_date):
             if pattern is None or re.search(pattern, snapshot_name, re.IGNORECASE):
                 snapshots_to_delete.append({
@@ -120,6 +131,7 @@ def list_snapshots(ec2_client, cutoff_date, until_date, pattern=None):
                 })
     return snapshots_to_delete
 
+# Function to delete Snapshots
 def delete_snapshot(ec2_client, snapshot_id):
     try:
         ec2_client.delete_snapshot(SnapshotId=snapshot_id)
@@ -157,12 +169,14 @@ def main():
     # Setup logger
     setup_logger(log_file)
 
+    # Initialize clients
     ec2_client = boto3.client('ec2')
     imagebuilder_client = boto3.client('imagebuilder')
 
+    # Dictionary to store resources to delete
     resources_to_delete = {resource_type: [] for resource_type in args.resource_types}
 
-    # List resources based on date range and pattern
+    # List resources based on date range and pattern if provided
     if cutoff_date or args.pattern:
         logging.info(f"Listing resources created between {cutoff_date} and {until_date} with pattern {args.pattern}...")
 
@@ -175,8 +189,20 @@ def main():
         if 'snapshot' in args.resource_types:
             resources_to_delete['snapshot'].extend(list_snapshots(ec2_client, cutoff_date, until_date, pattern=args.pattern))
 
-    #```python
-    # List resources based on specific names
+    # List all resources if neither cutoff_date nor pattern is provided
+    if not cutoff_date and not args.pattern:
+        logging.info("No cutoff date or pattern provided. Listing all resources of the specified types...")
+
+        if 'ami' in args.resource_types:
+            resources_to_delete['ami'].extend(list_amis(ec2_client, None, until_date))
+        if 'pipeline' in args.resource_types:
+            resources_to_delete['pipeline'].extend(list_image_pipelines(imagebuilder_client, None, until_date))
+        if 'image' in args.resource_types:
+            resources_to_delete['image'].extend(list_images(imagebuilder_client, None, until_date))
+        if 'snapshot' in args.resource_types:
+            resources_to_delete['snapshot'].extend(list_snapshots(ec2_client, None, until_date))
+
+    # List resources based on specific names if provided
     if args.resource_names:
         resource_names = args.resource_names
         logging.info(f"Listing resources with specific names: {resource_names}")
@@ -224,7 +250,7 @@ def main():
                             'CreationTime': snapshot['StartTime'].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
                         })
 
-    # Remove duplicates
+    # Remove duplicates from the resources to delete
     for resource_type in args.resource_types:
         if resource_type == 'ami':
             resources_to_delete[resource_type] = list({ami['ImageId']: ami for ami in resources_to_delete[resource_type]}.values())
