@@ -77,8 +77,8 @@ def filter_buckets_by_pattern(bucket_names, pattern):
 def main():
     parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
     parser.add_argument("buckets", nargs='*', help="Names of the S3 buckets")
-    parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
-    parser.add_argument("--until-date", help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
+    parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)", default=None)
+    parser.add_argument("--until-date", help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)", default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     parser.add_argument("--pattern", help="Pattern to filter bucket names (case-insensitive)")
     parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
     parser.add_argument("--log-file", "-l", help="Log file to store the output")
