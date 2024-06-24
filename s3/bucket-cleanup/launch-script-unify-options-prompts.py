@@ -70,26 +70,37 @@ def list_buckets_created_between(s3_client, cutoff_date, until_date):
 
 def main():
     parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
-    parser.add_argument("buckets", nargs='+', help="Names of the S3 buckets")
-    parser.add_argument("--cutoff-date", required=True, help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
-    parser.add_argument("--until-date", required=True, help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
+    parser.add_argument("buckets", nargs='*', help="Names of the S3 buckets")
+    parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
+    parser.add_argument("--until-date", help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)")
     parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
     parser.add_argument("--log-file", "-l", help="Log file to store the output")
     parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
     
     args = parser.parse_args()
 
-    try:
-        cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    except ValueError:
-        logging.error("Incorrect cutoff date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
-        sys.exit(1)
+    # Validate that at least one of the required arguments is provided
+    if not args.buckets and not args.cutoff_date and not args.until_date:
+        parser.error("You must provide at least one of the following: bucket names, --cutoff-date, or --until-date")
 
-    try:
-        until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    except ValueError:
-        logging.error("Incorrect until date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
-        sys.exit(1)
+    # Parse the dates if provided
+    if args.cutoff_date:
+        try:
+            cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            logging.error("Incorrect cutoff date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+            sys.exit(1)
+    else:
+        cutoff_date = datetime.min.replace(tzinfo=timezone.utc)
+
+    if args.until_date:
+        try:
+            until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            logging.error("Incorrect until date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+            sys.exit(1)
+    else:
+        until_date = datetime.now(timezone.utc)
 
     # Define the default log file path
     log_dir = args.log_dir
@@ -101,12 +112,17 @@ def main():
     setup_logger(log_file)
 
     s3_client = boto3.client('s3')
-    bucket_names = args.buckets
 
-    logging.info(f"Found {len(bucket_names)} buckets provided as arguments.")
+    # Get bucket names based on arguments
+    if args.buckets:
+        bucket_names = args.buckets
+    else:
+        bucket_names = list_buckets_created_between(s3_client, cutoff_date, until_date)
+
+    logging.info(f"Found {len(bucket_names)} buckets to be processed.")
 
     if not bucket_names:
-        print("No buckets provided.")
+        print("No buckets found to process.")
         sys.exit(0)
 
     print("Buckets to be processed:")
