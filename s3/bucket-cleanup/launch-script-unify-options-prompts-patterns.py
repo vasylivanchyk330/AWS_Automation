@@ -34,7 +34,7 @@ def log_unique_lines(log_func, message):
             log_func(line)
             seen_lines.add(line)
 
-def run_script(script_path, script_args, retries=5, delay=10):
+def run_script(script_path, script_args, retries=15, delay=10):
     """Run a script with arguments and wait for it to finish."""
     attempt = 0
     while attempt < retries:
