@@ -4,7 +4,9 @@ import argparse
 import logging
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
+import boto3
+import re
 
 def setup_logger(log_file):
     """Setup logger to log messages to both console and file."""
@@ -32,7 +34,7 @@ def log_unique_lines(log_func, message):
             log_func(line)
             seen_lines.add(line)
 
-def run_script(script_path, script_args, retries=5, delay=10):
+def run_script(script_path, script_args, retries=15, delay=10):
     """Run a script with arguments and wait for it to finish."""
     attempt = 0
     while attempt < retries:
@@ -57,20 +59,58 @@ def run_script(script_path, script_args, retries=5, delay=10):
                     return False
     return False
 
-def main():
-    # parses arguments
-    parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
-    parser.add_argument("buckets", nargs="+", help="Names of the S3 buckets")
-    parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
-    parser.add_argument("--log-file", "-l", type=str, help="Log file to store the output")
+def list_buckets_created_between(s3_client, cutoff_date, until_date):
+    """List all S3 buckets created between the specified cutoff date and until date."""
+    buckets_to_delete = []
+    response = s3_client.list_buckets()
+    for bucket in response['Buckets']:
+        creation_date = bucket['CreationDate']
+        if cutoff_date < creation_date <= until_date:
+            buckets_to_delete.append(bucket['Name'])
+    return buckets_to_delete
 
+def filter_buckets_by_pattern(bucket_names, pattern):
+    """Filter bucket names by a case-insensitive pattern."""
+    regex = re.compile(pattern, re.IGNORECASE)
+    return [bucket for bucket in bucket_names if regex.search(bucket)]
+
+def main():
+    parser = argparse.ArgumentParser(description="Run a series of S3 bucket management scripts.")
+    parser.add_argument("buckets", nargs='*', help="Names of the S3 buckets")
+    parser.add_argument("--cutoff-date", help="Cutoff date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)", default=None)
+    parser.add_argument("--until-date", help="Until date-time in format YYYY-MM-DDTHH:MM:SSZ (UTC)", default=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    parser.add_argument("--pattern", help="Pattern to filter bucket names (case-insensitive)")
+    parser.add_argument("--lifecycle-rules-wait", "-w", type=int, default=0, help="Minutes to wait after setting lifecycle rules")
+    parser.add_argument("--log-file", "-l", help="Log file to store the output")
+    parser.add_argument("--log-dir", "-d", help="Directory to store the log file", default="./.script-logs")
+    
     args = parser.parse_args()
 
-    bucket_names = args.buckets
-    wait_time = args.lifecycle_rules_wait
+    # Validate that at least one of the required arguments is provided
+    if not args.buckets and not args.cutoff_date and not args.until_date and not args.pattern:
+        parser.error("You must provide at least one of the following: bucket names, --cutoff-date, --until-date, or --pattern")
+
+    # Parse the dates if provided
+    if args.cutoff_date:
+        try:
+            cutoff_date = datetime.strptime(args.cutoff_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            logging.error("Incorrect cutoff date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+            sys.exit(1)
+    else:
+        cutoff_date = datetime.min.replace(tzinfo=timezone.utc)
+
+    if args.until_date:
+        try:
+            until_date = datetime.strptime(args.until_date, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            logging.error("Incorrect until date-time format. Use YYYY-MM-DDTHH:MM:SSZ (UTC).")
+            sys.exit(1)
+    else:
+        until_date = datetime.now(timezone.utc)
 
     # Define the default log file path
-    log_dir = "./.script-logs"
+    log_dir = args.log_dir
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     log_file = args.log_file or os.path.join(log_dir, f"script_run_{datetime.now().strftime('%Y_%m_%d___%H%M%S')}.log")
@@ -78,9 +118,43 @@ def main():
     # Setup logger
     setup_logger(log_file)
 
+    s3_client = boto3.client('s3')
+
+    # Get bucket names based on arguments
+    bucket_names = []
+    if args.buckets:
+        bucket_names.extend(args.buckets)
+    else:
+        if args.cutoff_date or args.until_date:
+            bucket_names.extend(list_buckets_created_between(s3_client, cutoff_date, until_date))
+        if args.pattern:
+            bucket_names = filter_buckets_by_pattern(bucket_names, args.pattern)
+
+    # Remove duplicates
+    bucket_names = list(set(bucket_names))
+
+    logging.info(f"Found {len(bucket_names)} buckets to be processed.")
+
+    if not bucket_names:
+        print("No buckets found to process.")
+        sys.exit(0)
+
+    print("Buckets to be processed:")
+    for bucket in bucket_names:
+        print(f" - {bucket}")
+
+    confirm_all = input("Do you want to delete them all? (yes/no): ").strip().lower()
+    delete_all = confirm_all == 'yes'
+
     success = True  # Track the success of script runs
 
     for bucket_name in bucket_names:
+        if not delete_all:
+            confirm_each = input(f"Do you want to delete the bucket {bucket_name}? (yes/no): ").strip().lower()
+            if confirm_each != 'yes':
+                logging.info(f"Skipping deletion of bucket: {bucket_name}")
+                continue
+
         logging.info(f"Processing bucket: {bucket_name}")
 
         # List of scripts to run in the given order with their respective arguments
@@ -103,9 +177,9 @@ def main():
                 break
 
             # If the current script is the lifecycle rule script, wait for the specified time
-            if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and wait_time > 0:
-                logging.info(f"Waiting for {wait_time} minutes before proceeding to the next script...")
-                time.sleep(wait_time * 60)  # Convert minutes to seconds
+            if script_path == "set-lifecycle-rule/set-lifecycle-rule.py" and args.lifecycle_rules_wait > 0:
+                logging.info(f"Waiting for {args.lifecycle_rules_wait} minutes before proceeding to the next script...")
+                time.sleep(args.lifecycle_rules_wait * 60)  # Convert minutes to seconds
 
         if not success:
             break

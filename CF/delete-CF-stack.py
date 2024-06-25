@@ -55,26 +55,12 @@ def delete_stack(cf_client, stack_name, retries=3):
         logging.error(f"Error deleting stack {stack_name}: {e}")
         if 'DELETE_FAILED' in str(e):
             logging.error(f"Stack {stack_name} entered DELETE_FAILED state. Retrying... (Attempt {attempt+1}/{retries})")
-            # Investigate the cause of DELETE_FAILED
-            investigate_delete_failed(cf_client, stack_name)
+            # for later: can put some code in here for cause investigatiion of DELETE_FAILED
         else:
             logging.error(f"Failed to delete stack {stack_name}: {e}")
             return
 
     logging.error(f"Failed to delete stack {stack_name} after {retries} attempts. Please investigate manually.")
-
-def investigate_delete_failed(cf_client, stack_name):
-    """Investigate the cause of DELETE_FAILED status."""
-    logging.info(f"Investigating DELETE_FAILED status for stack: {stack_name}")
-    events = cf_client.describe_stack_events(StackName=stack_name)['StackEvents']
-    failed_events = [event for event in events if event['ResourceStatus'] == 'DELETE_FAILED']
-    
-    for event in failed_events:
-        logging.error(f"Resource {event['LogicalResourceId']} failed to delete: {event['ResourceStatusReason']}")
-        # Additional logic can be added here to handle specific failures
-        if 'Custom Resource' in event['ResourceType']:
-            logging.error("Custom Resource failure detected. Check your Lambda function and ensure it is correctly responding to CloudFormation.")
-            # Implement any necessary fix or notification
 
 def read_exclude_stacks(file_path):
     """Read the list of stack names to exclude from a file."""
