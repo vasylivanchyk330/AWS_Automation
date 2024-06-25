@@ -124,10 +124,11 @@ def main():
     bucket_names = []
     if args.buckets:
         bucket_names.extend(args.buckets)
-    if args.cutoff_date or args.until_date:
-        bucket_names.extend(list_buckets_created_between(s3_client, cutoff_date, until_date))
-    if args.pattern:
-        bucket_names = filter_buckets_by_pattern(bucket_names, args.pattern)
+    else:
+        if args.cutoff_date or args.until_date:
+            bucket_names.extend(list_buckets_created_between(s3_client, cutoff_date, until_date))
+        if args.pattern:
+            bucket_names = filter_buckets_by_pattern(bucket_names, args.pattern)
 
     # Remove duplicates
     bucket_names = list(set(bucket_names))
